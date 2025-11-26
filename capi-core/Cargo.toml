@@ -1,0 +1,28 @@
+[package]
+name = "capi-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
+rusqlite.workspace = true
+dirs.workspace = true
+urlencoding.workspace = true
+uuid.workspace = true
+
+tower = "0.4"
+tower-http = { version = "0.5", features = ["fs", "cors"] }
+futures = "0.3"
+async-stream = "0.3"
+
+[build-dependencies]
+bindgen = "0.69"

@@ -1,0 +1,17 @@
+[package]
+name = "capi-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "capi"
+path = "src/main.rs"
+
+[dependencies]
+capi-core = { path = "../capi-core" }
+clap = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+dialoguer = { workspace = true }
