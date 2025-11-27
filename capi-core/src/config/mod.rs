@@ -12,6 +12,10 @@ pub struct Config {
     pub device_preference: DevicePreference,
     pub auto_start: bool,
     pub keep_server_running: bool,
+    #[serde(default = "default_resource_mode")]
+    pub resource_mode: ResourceMode,
+    #[serde(default = "default_context_length")]
+    pub default_context_length: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +25,21 @@ pub enum DevicePreference {
     GPU,
     CPU,
     NPU,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ResourceMode {
+    Strict,
+    Loose,
+}
+
+fn default_resource_mode() -> ResourceMode {
+    ResourceMode::Strict
+}
+
+fn default_context_length() -> u64 {
+    4096
 }
 
 impl Default for Config {
@@ -34,6 +53,8 @@ impl Default for Config {
             device_preference: DevicePreference::Auto,
             auto_start: false,
             keep_server_running: false,
+            resource_mode: ResourceMode::Strict,
+            default_context_length: 4096,
         }
     }
 }

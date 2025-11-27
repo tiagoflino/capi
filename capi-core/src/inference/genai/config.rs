@@ -1,5 +1,6 @@
 use super::{ffi, check_status, Result};
 use std::ptr;
+use std::ffi::CString;
 
 pub struct GenerationConfig {
     raw: *mut ffi::ov_genai_generation_config,
@@ -22,6 +23,28 @@ impl GenerationConfig {
     pub fn set_max_new_tokens(&mut self, max_tokens: usize) -> Result<()> {
         unsafe {
             let status = ffi::ov_genai_generation_config_set_max_new_tokens(self.raw, max_tokens);
+            check_status(status)
+        }
+    }
+
+    pub fn set_stop_strings(&mut self, stop_strings: &[&str]) -> Result<()> {
+        unsafe {
+            let c_strings: Vec<CString> = stop_strings
+                .iter()
+                .map(|s| CString::new(*s).unwrap())
+                .collect();
+
+            let mut c_ptrs: Vec<*const i8> = c_strings
+                .iter()
+                .map(|s| s.as_ptr())
+                .collect();
+
+            let status = ffi::ov_genai_generation_config_set_stop_strings(
+                self.raw,
+                c_ptrs.as_mut_ptr(),
+                c_ptrs.len(),
+            );
+
             check_status(status)
         }
     }

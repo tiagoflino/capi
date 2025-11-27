@@ -44,9 +44,28 @@ enum Commands {
         query: String,
     },
     /// Show or edit configuration
-    Config,
+    Config {
+        #[command(subcommand)]
+        action: Option<ConfigCommands>,
+    },
     /// Show hardware information
     Hardware,
+}
+
+#[derive(Subcommand)]
+enum ConfigCommands {
+    /// Show current configuration
+    Show,
+    /// Set resource mode (strict or loose)
+    SetResourceMode {
+        /// Mode: strict or loose
+        mode: String,
+    },
+    /// Set default context length
+    SetContextLength {
+        /// Context length in tokens
+        length: u64,
+    },
 }
 
 #[derive(Subcommand)]
@@ -107,6 +126,10 @@ async fn main() -> Result<()> {
                     println!("\nUse 'capi model search <query>' to find models");
                     println!("Use 'capi model install-from-hf <id>' to install");
                 } else {
+                    let resources = capi_core::detect_system_resources().ok();
+                    let devices = capi_core::detect_devices()?;
+                    let selected_device = capi_core::select_best_device(&devices, &config.device_preference);
+
                     println!("Installed models ({}):\n", models.len());
                     for (idx, model) in models.iter().enumerate() {
                         let quant = model.quantization.as_deref().unwrap_or("-");
@@ -121,18 +144,47 @@ async fn main() -> Result<()> {
                             })
                             .unwrap_or_else(|| "-".to_string());
 
+                        let mem_str = model.estimated_memory_bytes
+                            .map(|m| format!("{:.1}GB", m as f64 / 1_000_000_000.0))
+                            .unwrap_or_else(|| "?".to_string());
+
+                        let fit_indicator = if let (Some(est_mem), Some(res), Some(dev)) =
+                            (model.estimated_memory_bytes, &resources, &selected_device) {
+                            let available = if dev.to_uppercase().contains("GPU") {
+                                res.gpu_resources.first().map(|g| g.available_vram_bytes).unwrap_or(0)
+                            } else {
+                                res.available_ram_bytes
+                            };
+
+                            let safe = (available as f64 * 0.8) as u64;
+                            let tight = (available as f64 * 0.95) as u64;
+
+                            if est_mem <= safe as i64 {
+                                "✓"
+                            } else if est_mem <= tight as i64 {
+                                "⚠"
+                            } else {
+                                "✗"
+                            }
+                        } else {
+                            " "
+                        };
+
                         let last_used = model.last_used
                             .map(|ts| format_timestamp(ts))
                             .unwrap_or_else(|| "never".to_string());
 
-                        println!("  [{:2}] {:<40} {:>6}  {:>6}  {}",
+                        println!("  [{:2}] {:<35} {:>6} {:>6} {:>7} {} {}",
                             idx + 1,
                             model.name,
                             quant,
                             size_str,
+                            mem_str,
+                            fit_indicator,
                             last_used
                         );
                     }
+                    println!("\nLegend: ✓ fits  ⚠ tight  ✗ insufficient memory");
                 }
             }
             ModelCommands::Info { model } => {
@@ -187,6 +239,9 @@ async fn main() -> Result<()> {
                 let model_file = detect_model_format(&model_path)?;
                 let display_name = name.unwrap_or_else(|| model.split('/').last().unwrap_or(&model).to_string());
 
+                let file_size = std::fs::metadata(&model_file).ok().map(|m| m.len() as i64);
+                let estimated_memory = file_size.map(|s| (s as f64 * 1.5) as i64);
+
                 let db = Arc::new(capi_core::Database::open(config.database_path())?);
                 let registry = capi_core::Registry::new(db);
 
@@ -198,11 +253,13 @@ async fn main() -> Result<()> {
                     id: safe_name.clone(),
                     name: display_name,
                     path: model_file.to_string_lossy().to_string(),
-                    size_bytes: None,
+                    size_bytes: file_size,
                     quantization: None,
                     context_length: None,
                     created_at: timestamp,
                     last_used: None,
+                    estimated_memory_bytes: estimated_memory,
+                    context_override: None,
                 };
 
                 registry.add_model(model_record)?;
@@ -224,6 +281,9 @@ async fn main() -> Result<()> {
                 let model_file = detect_model_format(&model_path)?;
                 let display_name = name.unwrap_or_else(|| model.clone());
 
+                let file_size = std::fs::metadata(&model_file).ok().map(|m| m.len() as i64);
+                let estimated_memory = file_size.map(|s| (s as f64 * 1.5) as i64);
+
                 let timestamp = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)?
                     .as_secs() as i64;
@@ -232,11 +292,13 @@ async fn main() -> Result<()> {
                     id: model.clone(),
                     name: display_name,
                     path: model_file.to_string_lossy().to_string(),
-                    size_bytes: None,
+                    size_bytes: file_size,
                     quantization: None,
                     context_length: None,
                     created_at: timestamp,
                     last_used: None,
+                    estimated_memory_bytes: estimated_memory,
+                    context_override: None,
                 };
 
                 registry.add_model(model_record)?;
@@ -285,6 +347,10 @@ async fn main() -> Result<()> {
         },
         Commands::Run { model } => {
             use std::io::{self, Write};
+            use crossterm::{
+                event::{self, Event, KeyCode, KeyEventKind},
+                terminal::{enable_raw_mode, disable_raw_mode},
+            };
 
             let config = capi_core::Config::load()?;
             let db = Arc::new(capi_core::Database::open(config.database_path())?);
@@ -314,26 +380,73 @@ async fn main() -> Result<()> {
             let device = capi_core::select_best_device(&devices, &config.device_preference)
                 .unwrap_or_else(|| "CPU".to_string());
 
-            println!("Loading on device: {}", device);
+            println!("Loading on device: {}...", device);
 
             let mut session = capi_core::InferenceSession::load(model_path, &device)?;
+            session.start_chat()?;
 
-            println!("Ready! Type your message (or /exit to quit)\n");
+            print!("\r\n╭─────────────────────────────────────────────────────────╮\r\n");
+            print!("│ Model: {:<48} │\r\n", model_record.name);
+            print!("│ Device: {:<47} │\r\n", device);
 
-            let stdin = io::stdin();
-            let mut conversation = Vec::new();
+            let cpu = get_cpu_usage();
+            if let Ok(resources) = capi_core::detect_system_resources() {
+                let ram_used = (resources.total_ram_bytes - resources.available_ram_bytes) / 1_000_000_000;
+                let ram_total = resources.total_ram_bytes / 1_000_000_000;
+                print!("│ CPU: {:>3.0}%  RAM: {:.1}/{:.1} GB{:<27} │\r\n", cpu, ram_used, ram_total, "");
+            }
 
-            loop {
-                print!(">>> ");
-                io::stdout().flush()?;
+            print!("╰─────────────────────────────────────────────────────────╯\r\n");
+            print!("\r\nType your message (or /exit to quit, ESC to stop generation)\r\n\r\n");
+            io::stdout().flush()?;
 
-                let mut input = String::new();
-                stdin.read_line(&mut input)?;
+            enable_raw_mode()?;
+            use std::sync::{Arc as StdArc, atomic::{AtomicBool, Ordering}};
+            let should_stop = StdArc::new(AtomicBool::new(false));
 
-                let input = input.trim();
+            let result = (|| -> Result<()> {
+                loop {
+                    print!(">>> ");
+                    io::stdout().flush()?;
+
+                    let mut input_buffer = String::new();
+
+                    // Read input character by character
+                    loop {
+                        if event::poll(std::time::Duration::from_millis(100))? {
+                            if let Event::Key(key) = event::read()? {
+                                if key.kind != KeyEventKind::Press {
+                                    continue;
+                                }
+
+                                match key.code {
+                                    KeyCode::Enter => {
+                                        print!("\r\n");
+                                        io::stdout().flush()?;
+                                        break;
+                                    },
+                                    KeyCode::Char(c) => {
+                                        input_buffer.push(c);
+                                        print!("{}", c);
+                                        io::stdout().flush()?;
+                                    },
+                                    KeyCode::Backspace if !input_buffer.is_empty() => {
+                                        input_buffer.pop();
+                                        print!("\x08 \x08");
+                                        io::stdout().flush()?;
+                                    },
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+
+                    let input = input_buffer.trim();
 
                 if input == "/exit" || input == "/quit" {
-                    println!("Goodbye!");
+                    print!("Goodbye!\r\n");
+                    io::stdout().flush()?;
+                    session.finish_chat()?;
                     break;
                 }
 
@@ -341,16 +454,99 @@ async fn main() -> Result<()> {
                     continue;
                 }
 
-                conversation.push(format!("User: {}", input));
+                should_stop.store(false, Ordering::Relaxed);
+                let stop_clone = StdArc::clone(&should_stop);
+                let stop_clone_thread = StdArc::clone(&should_stop);
+                let stop_clone_status = StdArc::clone(&should_stop);
 
-                let full_prompt = conversation.join("\n") + "\nAssistant:";
+                // ESC detection thread
+                let esc_handle = std::thread::spawn(move || {
+                    loop {
+                        if event::poll(std::time::Duration::from_millis(50)).unwrap_or(false) {
+                            if let Ok(Event::Key(key)) = event::read() {
+                                if key.code == KeyCode::Esc && key.kind == KeyEventKind::Press {
+                                    stop_clone_thread.store(true, Ordering::Relaxed);
+                                    eprint!("\r\n[Stopping generation...]\r\n");
+                                    use std::io::Write;
+                                    std::io::stderr().flush().ok();
+                                    break;
+                                }
+                            }
+                        }
+                        if stop_clone_thread.load(Ordering::Relaxed) {
+                            break;
+                        }
+                    }
+                });
 
-                let (output, metrics) = session.generate_with_metrics(&full_prompt, 100)?;
-                println!("{}", output);
-                println!("({:.1} tok/s, {} tokens)\n", metrics.tokens_per_second, metrics.num_output_tokens);
+                print!("[Press ESC to stop generation]\r\n");
+                io::stdout().flush()?;
 
-                conversation.push(format!("Assistant: {}", output));
-            }
+                // Status updater thread
+                let status_handle = std::thread::spawn(move || {
+                    // Calculate absolute line position (header is at top of terminal)
+                    use std::io::Write;
+
+                    while !stop_clone_status.load(Ordering::Relaxed) {
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+
+                        if let Ok(resources) = capi_core::detect_system_resources() {
+                            let ram_used = (resources.total_ram_bytes - resources.available_ram_bytes) / 1_000_000_000;
+                            let ram_total = resources.total_ram_bytes / 1_000_000_000;
+                            let cpu = get_cpu_usage();
+
+                            // Save cursor position, move to header line, update, restore
+                            eprint!("\x1b[s");  // Save cursor (alternative)
+                            eprint!("\x1b[1;1H");  // Move to top-left
+                            eprint!("\x1b[4B");  // Move down 4 lines to stats line
+                            eprint!("│ CPU: {:>3.0}%  RAM: {:.1}/{:.1} GB{:<27} │", cpu, ram_used, ram_total, "");
+                            eprint!("\x1b[u");  // Restore cursor
+                            std::io::stderr().flush().ok();
+                        }
+                    }
+                });
+
+                let mut is_first_token = true;
+
+                let (output, metrics) = session.generate_stream(input, 4096, move |token| {
+                    // Check stop flag first
+                    if stop_clone.load(Ordering::Relaxed) {
+                        print!("\r\n\r\n[Generation stopped]\r\n");
+                        use std::io::Write;
+                        std::io::stdout().flush().ok();
+                        return false;
+                    }
+
+                    // Trim leading whitespace only on first token
+                    let display_token = if is_first_token {
+                        is_first_token = false;
+                        token.trim_start()
+                    } else {
+                        token
+                    };
+
+                    // In raw mode, replace \n with \r\n for proper line breaks
+                    let display_token = display_token.replace("\n", "\r\n");
+
+                    print!("{}", display_token);
+                    use std::io::Write;
+                    std::io::stdout().flush().ok();
+                    true
+                })?;
+
+                should_stop.store(true, Ordering::Relaxed);
+                esc_handle.join().ok();
+                status_handle.join().ok();
+
+                print!("\r\n({:.1} tok/s, {} tokens)\r\n\r\n", metrics.tokens_per_second, metrics.num_output_tokens);
+                io::stdout().flush()?;
+                }
+
+                Ok(())
+            })();
+
+            disable_raw_mode()?;
+            result?;
         }
         Commands::Generate { prompt } => {
             let config = capi_core::Config::load()?;
@@ -602,6 +798,7 @@ async fn main() -> Result<()> {
                 .as_secs() as i64;
 
             let file_size = gguf_files[quant_selection].size.map(|s| s as i64);
+            let estimated_memory = file_size.map(|s| (s as f64 * 1.5) as i64);
 
             let model_record = capi_core::db::ModelRecord {
                 id: safe_name.clone(),
@@ -612,22 +809,50 @@ async fn main() -> Result<()> {
                 context_length: model_data.context_length.map(|c| c as i64),
                 created_at: timestamp,
                 last_used: None,
+                estimated_memory_bytes: estimated_memory,
+                context_override: None,
             };
 
             registry.add_model(model_record)?;
             println!("✓ Model registered: {}", safe_name);
             println!("\nYou can now use: capi run {}", safe_name);
         }
-        Commands::Config => {
-            let config = capi_core::Config::load()?;
-            println!("Configuration:");
-            println!("  Server: {}:{}", config.server_host, config.server_port);
-            println!("  Server URL: {}", config.server_url());
-            println!("  Models directory: {}", config.models_dir.display());
-            println!("  Data directory: {}", config.data_dir.display());
-            println!("  Device preference: {:?}", config.device_preference);
-            println!("  Auto start: {}", config.auto_start);
-            println!("  Keep server running: {}", config.keep_server_running);
+        Commands::Config { action } => {
+            let mut config = capi_core::Config::load()?;
+
+            match action {
+                None | Some(ConfigCommands::Show) => {
+                    println!("Configuration:");
+                    println!("  Server: {}:{}", config.server_host, config.server_port);
+                    println!("  Server URL: {}", config.server_url());
+                    println!("  Models directory: {}", config.models_dir.display());
+                    println!("  Data directory: {}", config.data_dir.display());
+                    println!("  Device preference: {:?}", config.device_preference);
+                    println!("  Resource mode: {:?}", config.resource_mode);
+                    println!("  Default context length: {}K", config.default_context_length / 1024);
+                    println!("  Auto start: {}", config.auto_start);
+                    println!("  Keep server running: {}", config.keep_server_running);
+                }
+                Some(ConfigCommands::SetResourceMode { mode }) => {
+                    let mode_lower = mode.to_lowercase();
+                    config.resource_mode = match mode_lower.as_str() {
+                        "strict" => capi_core::ResourceMode::Strict,
+                        "loose" => capi_core::ResourceMode::Loose,
+                        _ => {
+                            return Err(anyhow::anyhow!(
+                                "Invalid resource mode: {}. Use 'strict' or 'loose'", mode
+                            ));
+                        }
+                    };
+                    config.save()?;
+                    println!("Resource mode set to: {:?}", config.resource_mode);
+                }
+                Some(ConfigCommands::SetContextLength { length }) => {
+                    config.default_context_length = length;
+                    config.save()?;
+                    println!("Default context length set to: {}K", length / 1024);
+                }
+            }
         }
         Commands::Hardware => {
             println!("Detecting hardware...");
@@ -643,6 +868,28 @@ async fn main() -> Result<()> {
             if let Some(selected) = capi_core::select_best_device(&devices, &config.device_preference) {
                 println!("\nSelected device (based on {:?} preference): {}",
                     config.device_preference, selected);
+            }
+
+            println!("\nSystem Resources:");
+            match capi_core::detect_system_resources() {
+                Ok(resources) => {
+                    println!("  Total RAM: {:.2} GB", resources.total_ram_bytes as f64 / 1_000_000_000.0);
+                    println!("  Available RAM: {:.2} GB", resources.available_ram_bytes as f64 / 1_000_000_000.0);
+
+                    if resources.gpu_resources.is_empty() {
+                        println!("  No GPU resources detected");
+                    } else {
+                        println!("  GPU Resources:");
+                        for (idx, gpu) in resources.gpu_resources.iter().enumerate() {
+                            println!("    GPU {}: {}", idx, gpu.name);
+                            println!("      Total VRAM: {:.2} GB", gpu.total_vram_bytes as f64 / 1_000_000_000.0);
+                            println!("      Available VRAM: {:.2} GB", gpu.available_vram_bytes as f64 / 1_000_000_000.0);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("  Error detecting resources: {}", e);
+                }
             }
         }
     }
@@ -671,6 +918,45 @@ fn find_file_with_extension(dir: &std::path::Path, ext: &str) -> Result<Option<s
         .filter_map(|e| e.ok())
         .find(|e| e.path().extension().map_or(false, |e| e == ext))
         .map(|e| e.path()))
+}
+
+fn get_cpu_usage() -> f32 {
+    #[cfg(target_os = "linux")]
+    {
+        use std::fs;
+        use std::thread;
+        use std::time::Duration;
+
+        if let Ok(stat1) = fs::read_to_string("/proc/stat") {
+            if let Some(line1) = stat1.lines().next() {
+                let parts1: Vec<&str> = line1.split_whitespace().collect();
+                if parts1.len() > 4 && parts1[0] == "cpu" {
+                    thread::sleep(Duration::from_millis(100));
+
+                    if let Ok(stat2) = fs::read_to_string("/proc/stat") {
+                        if let Some(line2) = stat2.lines().next() {
+                            let parts2: Vec<&str> = line2.split_whitespace().collect();
+                            if parts2.len() > 4 && parts2[0] == "cpu" {
+                                let idle1: f32 = parts1[4].parse().unwrap_or(0.0);
+                                let idle2: f32 = parts2[4].parse().unwrap_or(0.0);
+
+                                let total1: f32 = parts1[1..].iter().filter_map(|s| s.parse::<f32>().ok()).sum();
+                                let total2: f32 = parts2[1..].iter().filter_map(|s| s.parse::<f32>().ok()).sum();
+
+                                let total_diff = total2 - total1;
+                                let idle_diff = idle2 - idle1;
+
+                                if total_diff > 0.0 {
+                                    return ((total_diff - idle_diff) / total_diff * 100.0).min(100.0).max(0.0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    0.0
 }
 
 fn format_timestamp(ts: i64) -> String {

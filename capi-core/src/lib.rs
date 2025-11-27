@@ -10,4 +10,4 @@ pub use config::Config;
 pub use db::Database;
 pub use inference::{InferenceSession, InferenceMetrics};
 pub use model_manager::{Registry, Downloader, ModelInfo, HuggingFaceModel, ModelData, FileInfo};
-pub use hardware::{detect_devices, select_best_device, DeviceInfo, DeviceType};
+pub use hardware::{detect_devices, select_best_device, detect_system_resources, validate_model_load, DeviceInfo, DeviceType, SystemResources, GpuResource, ResourceMode, ValidationResult};

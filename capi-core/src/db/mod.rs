@@ -54,6 +54,16 @@ impl Database {
             [],
         )?;
 
+        // Add new columns if they don't exist (migration)
+        let has_estimated_memory = conn
+            .prepare("SELECT estimated_memory_bytes FROM models LIMIT 1")
+            .is_ok();
+
+        if !has_estimated_memory {
+            conn.execute("ALTER TABLE models ADD COLUMN estimated_memory_bytes INTEGER", [])?;
+            conn.execute("ALTER TABLE models ADD COLUMN context_override INTEGER", [])?;
+        }
+
         Ok(Self { conn: Mutex::new(conn) })
     }
 

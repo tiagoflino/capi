@@ -1,6 +1,8 @@
 use super::genai::LLMPipeline;
 use anyhow::Result;
 use std::path::Path;
+use crate::hardware::{detect_system_resources, validate_model_load, ValidationResult};
+use crate::config::Config;
 
 pub struct InferenceMetrics {
     pub tokens_per_second: f32,
@@ -25,6 +27,38 @@ impl InferenceSession {
             model_path.parent()
                 .ok_or_else(|| anyhow::anyhow!("Invalid model path"))?
         };
+
+        // Validate resources before loading
+        if let Ok(file_size) = std::fs::metadata(path_to_use).map(|m| m.len()) {
+            let estimated_memory = (file_size as f64 * 1.5) as u64;
+            let config = Config::load()?;
+
+            if let Ok(resources) = detect_system_resources() {
+                match validate_model_load(estimated_memory, device, &resources, &config.resource_mode)? {
+                    ValidationResult::Sufficient => {},
+                    ValidationResult::Warning { message } => {
+                        eprintln!("\nWarning: {}", message);
+                        eprintln!("This may cause OOM errors or system instability.");
+
+                        if matches!(config.resource_mode, crate::hardware::ResourceMode::Loose) {
+                            eprintln!("Press Enter to continue or Ctrl+C to cancel...");
+                            let mut input = String::new();
+                            std::io::stdin().read_line(&mut input)?;
+                        }
+                    },
+                    ValidationResult::Insufficient { message } => {
+                        return Err(anyhow::anyhow!(
+                            "Insufficient memory to load model\n\n{}\n\nSuggestions:\n\
+                            - Close other applications to free memory\n\
+                            - Try a more quantized version (Q3_K_M, Q2_K)\n\
+                            - Use a smaller model\n\
+                            - Change resource mode: capi config set-resource-mode loose",
+                            message
+                        ));
+                    },
+                }
+            }
+        }
 
         let pipeline = LLMPipeline::new(
             path_to_use.to_str().unwrap(),
@@ -58,6 +92,33 @@ impl InferenceSession {
 
     pub fn generate_with_metrics(&self, prompt: &str, max_tokens: usize) -> Result<(String, InferenceMetrics)> {
         let result = self.pipeline.generate_with_metrics(prompt, max_tokens)
+            .map_err(|e| anyhow::anyhow!("Generation failed: {}", e))?;
+
+        let (throughput, _) = result.metrics.throughput()
+            .map_err(|e| anyhow::anyhow!("Failed to get throughput: {}", e))?;
+        let (ttft, _) = result.metrics.ttft()
+            .map_err(|e| anyhow::anyhow!("Failed to get TTFT: {}", e))?;
+        let (duration, _) = result.metrics.generate_duration()
+            .map_err(|e| anyhow::anyhow!("Failed to get duration: {}", e))?;
+
+        let metrics = InferenceMetrics {
+            tokens_per_second: throughput,
+            time_to_first_token_ms: ttft,
+            num_input_tokens: result.metrics.num_input_tokens()
+                .map_err(|e| anyhow::anyhow!("Failed to get input tokens: {}", e))?,
+            num_output_tokens: result.metrics.num_generated_tokens()
+                .map_err(|e| anyhow::anyhow!("Failed to get output tokens: {}", e))?,
+            total_time_ms: duration,
+        };
+
+        Ok((result.text, metrics))
+    }
+
+    pub fn generate_stream<F>(&self, prompt: &str, max_tokens: usize, callback: F) -> Result<(String, InferenceMetrics)>
+    where
+        F: FnMut(&str) -> bool,
+    {
+        let result = self.pipeline.generate_stream(prompt, max_tokens, callback)
             .map_err(|e| anyhow::anyhow!("Generation failed: {}", e))?;
 
         let (throughput, _) = result.metrics.throughput()

@@ -138,6 +138,67 @@ async fn save_config(config: capi_core::Config) -> Result<(), String> {
     config.save().map_err(|e| e.to_string())
 }
 
+#[derive(Serialize)]
+struct SystemResourcesResponse {
+    total_ram_bytes: u64,
+    available_ram_bytes: u64,
+    cpu_usage_percent: f32,
+    selected_device: Option<String>,
+    gpu_resources: Vec<GpuResourceResponse>,
+}
+
+#[derive(Serialize)]
+struct GpuResourceResponse {
+    name: String,
+    total_vram_bytes: u64,
+    available_vram_bytes: u64,
+}
+
+#[tauri::command]
+async fn get_system_resources() -> Result<SystemResourcesResponse, String> {
+    let resources = capi_core::detect_system_resources()
+        .map_err(|e| e.to_string())?;
+
+    let config = capi_core::Config::load().map_err(|e| e.to_string())?;
+    let devices = capi_core::detect_devices().map_err(|e| e.to_string())?;
+    let selected_device = capi_core::select_best_device(&devices, &config.device_preference);
+
+    let cpu_usage = get_cpu_usage();
+
+    Ok(SystemResourcesResponse {
+        total_ram_bytes: resources.total_ram_bytes,
+        available_ram_bytes: resources.available_ram_bytes,
+        cpu_usage_percent: cpu_usage,
+        selected_device,
+        gpu_resources: resources.gpu_resources.iter().map(|gpu| GpuResourceResponse {
+            name: gpu.name.clone(),
+            total_vram_bytes: gpu.total_vram_bytes,
+            available_vram_bytes: gpu.available_vram_bytes,
+        }).collect(),
+    })
+}
+
+fn get_cpu_usage() -> f32 {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(stat) = std::fs::read_to_string("/proc/stat") {
+            if let Some(line) = stat.lines().next() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() > 4 && parts[0] == "cpu" {
+                    let idle: f32 = parts[4].parse().unwrap_or(0.0);
+                    let total: f32 = parts[1..].iter()
+                        .filter_map(|s| s.parse::<f32>().ok())
+                        .sum();
+                    if total > 0.0 {
+                        return ((total - idle) / total * 100.0).min(100.0);
+                    }
+                }
+            }
+        }
+    }
+    0.0
+}
+
 fn get_server_executable_path() -> PathBuf {
     let exe_dir = std::env::current_exe()
         .unwrap()
@@ -187,6 +248,7 @@ pub fn run() {
             download_model,
             get_config,
             save_config,
+            get_system_resources,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

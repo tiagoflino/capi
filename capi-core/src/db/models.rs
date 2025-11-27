@@ -12,11 +12,14 @@ pub struct ModelRecord {
     pub context_length: Option<i64>,
     pub created_at: i64,
     pub last_used: Option<i64>,
+    pub estimated_memory_bytes: Option<i64>,
+    pub context_override: Option<i64>,
 }
 
 pub fn list_models(conn: &Connection) -> Result<Vec<ModelRecord>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, path, size_bytes, quantization, context_length, created_at, last_used
+        "SELECT id, name, path, size_bytes, quantization, context_length, created_at, last_used,
+                estimated_memory_bytes, context_override
          FROM models
          ORDER BY last_used DESC, created_at DESC"
     )?;
@@ -31,6 +34,8 @@ pub fn list_models(conn: &Connection) -> Result<Vec<ModelRecord>> {
             context_length: row.get(5)?,
             created_at: row.get(6)?,
             last_used: row.get(7)?,
+            estimated_memory_bytes: row.get(8)?,
+            context_override: row.get(9)?,
         })
     })?
     .collect::<Result<Vec<_>, _>>()?;
@@ -40,7 +45,8 @@ pub fn list_models(conn: &Connection) -> Result<Vec<ModelRecord>> {
 
 pub fn get_model(conn: &Connection, id: &str) -> Result<Option<ModelRecord>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, path, size_bytes, quantization, context_length, created_at, last_used
+        "SELECT id, name, path, size_bytes, quantization, context_length, created_at, last_used,
+                estimated_memory_bytes, context_override
          FROM models
          WHERE id = ?"
     )?;
@@ -55,6 +61,8 @@ pub fn get_model(conn: &Connection, id: &str) -> Result<Option<ModelRecord>> {
             context_length: row.get(5)?,
             created_at: row.get(6)?,
             last_used: row.get(7)?,
+            estimated_memory_bytes: row.get(8)?,
+            context_override: row.get(9)?,
         })
     }).optional()?;
 
@@ -63,8 +71,9 @@ pub fn get_model(conn: &Connection, id: &str) -> Result<Option<ModelRecord>> {
 
 pub fn insert_model(conn: &Connection, model: &ModelRecord) -> Result<()> {
     conn.execute(
-        "INSERT INTO models (id, name, path, size_bytes, quantization, context_length, created_at, last_used)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO models (id, name, path, size_bytes, quantization, context_length, created_at, last_used,
+                             estimated_memory_bytes, context_override)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         (
             &model.id,
             &model.name,
@@ -74,6 +83,8 @@ pub fn insert_model(conn: &Connection, model: &ModelRecord) -> Result<()> {
             &model.context_length,
             &model.created_at,
             &model.last_used,
+            &model.estimated_memory_bytes,
+            &model.context_override,
         ),
     )?;
     Ok(())
