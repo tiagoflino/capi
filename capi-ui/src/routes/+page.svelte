@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { onMount } from 'svelte';
 
   interface Model {
@@ -27,6 +28,7 @@
   let input = $state('');
   let generating = $state(false);
   let loadingStatus = $state('');
+  let modelLoading = $state(false);
 
   onMount(async () => {
     try {
@@ -34,11 +36,36 @@
       models = modelList;
       if (models.length > 0) {
         selectedModel = models[0].id;
+        // Don't preload automatically - let user select when ready
       }
     } catch (e) {
       console.error('Failed to load models:', e);
     }
   });
+
+  async function onModelChange(e: Event) {
+    const target = e.target as HTMLSelectElement;
+    const newModel = target.value;
+    if (newModel && newModel !== selectedModel) {
+      selectedModel = newModel;
+      await preloadModel(newModel);
+    }
+  }
+
+  async function preloadModel(modelId: string) {
+    modelLoading = true;
+    loadingStatus = 'Loading model into memory...';
+    try {
+      const result = await invoke('load_model_direct', { modelId });
+      loadingStatus = 'Model ready';
+      console.log(result);
+      setTimeout(() => loadingStatus = '', 2000);
+    } catch (e: any) {
+      loadingStatus = `Error: ${e}`;
+      console.error('Model load failed:', e);
+    }
+    modelLoading = false;
+  }
 
   async function sendMessage() {
     if (!input.trim() || !selectedModel || generating) return;
@@ -48,73 +75,42 @@
 
     messages = [...messages, { role: 'user', content: userMessage }];
     generating = true;
-    loadingStatus = 'Loading model...';
+    loadingStatus = 'Generating...';
 
     const messageIndex = messages.length;
     messages = [...messages, { role: 'assistant', content: '' }];
 
+    // Listen for token events
+    const unlisten = await listen('chat-token', (event: any) => {
+      const token = event.payload.token;
+      messages[messageIndex].content += token;
+      messages = [...messages];
+    });
+
     try {
-      const config = await invoke<Config>('get_config');
-      const serverUrl = config.server_url || 'http://127.0.0.1:3000';
-
-      loadingStatus = 'Generating response...';
-
-      const response = await fetch(`${serverUrl}/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: messages.slice(0, messageIndex).map(m => ({ role: m.role, content: m.content })),
-          stream: true,
-        }),
+      const metrics = await invoke('chat_direct', {
+        modelId: selectedModel,
+        prompt: userMessage,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Server error ${response.status}: ${errorText}`);
-      }
-
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.trim() || !line.startsWith('data: ')) continue;
-
-          const data = line.slice(6);
-          if (data === '[DONE]') continue;
-
-          try {
-            const chunk = JSON.parse(data);
-            const token = chunk.choices?.[0]?.delta?.content;
-            if (token) {
-              messages[messageIndex].content += token;
-              messages = [...messages];
-            }
-          } catch (e) {
-            console.error('Failed to parse chunk:', e);
-          }
-        }
-      }
+      messages[messageIndex].metrics = {
+        tokens_per_second: metrics.tokens_per_second,
+        time_to_first_token_ms: metrics.time_to_first_token_ms,
+        completion_tokens: metrics.num_output_tokens,
+      };
+      messages = [...messages];
     } catch (e: any) {
       console.error('Chat failed:', e);
       messages[messageIndex] = {
         role: 'system',
-        content: `⚠ Error: ${e.message || e}\n\nMake sure capi-server is running with: capi-server`
+        content: `⚠ Error: ${e}\n\nLoad the model first by selecting it from the dropdown.`
       };
       messages = [...messages];
+    } finally {
+      unlisten();
+      generating = false;
+      loadingStatus = '';
     }
-
-    generating = false;
-    loadingStatus = '';
   }
 
   function clearChat() {
@@ -129,7 +125,7 @@
       <div style="display: flex; align-items: center; gap: 16px;">
         <select
           bind:value={selectedModel}
-          disabled={generating}
+          disabled={generating || modelLoading}
           style="padding: 8px 16px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px; cursor: pointer;"
         >
           {#if models.length === 0}
@@ -140,7 +136,14 @@
             {/each}
           {/if}
         </select>
-        {#if generating}
+        <button
+          onclick={() => preloadModel(selectedModel)}
+          disabled={!selectedModel || generating || modelLoading}
+          style="padding: 8px 16px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); border: none; color: white; font-weight: 600; border-radius: 8px; cursor: pointer; font-size: 13px; opacity: {!selectedModel || generating || modelLoading ? '0.3' : '1'};"
+        >
+          {modelLoading ? 'Loading...' : 'Load Model'}
+        </button>
+        {#if generating || modelLoading}
           <span style="font-size: 13px; color: #888;">{loadingStatus}</span>
         {/if}
       </div>

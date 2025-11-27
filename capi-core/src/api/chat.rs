@@ -4,7 +4,7 @@ use axum::{
     extract::State,
     http::StatusCode,
 };
-use futures::stream::{self, Stream};
+use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;

@@ -22,10 +22,13 @@
   }
 
   let resources = $state<SystemResources | null>(null);
+  let serverStatus = $state<any>(null);
 
   onMount(() => {
     updateResources();
+    updateServerStatus();
     setInterval(updateResources, 2000);
+    setInterval(updateServerStatus, 2000);
   });
 
   async function updateResources() {
@@ -33,6 +36,27 @@
       resources = await invoke('get_system_resources');
     } catch (e) {
       console.error('Failed to get resources:', e);
+    }
+  }
+
+  async function updateServerStatus() {
+    try {
+      serverStatus = await invoke('get_server_status');
+    } catch (e) {
+      console.error('Failed to get server status:', e);
+    }
+  }
+
+  async function toggleServer() {
+    try {
+      if (serverStatus?.running) {
+        await invoke('stop_server');
+      } else {
+        await invoke('start_server');
+      }
+      await updateServerStatus();
+    } catch (e) {
+      alert('Failed to toggle server: ' + e);
     }
   }
 </script>
@@ -92,7 +116,7 @@
       </a>
     </nav>
 
-    <!-- Bottom Info - Resource Gauges -->
+    <!-- Bottom Info - Resource Gauges & Server Control -->
     <div style="padding: 12px; border-top: 1px solid #282828;">
       {#if resources}
         <ResourceGauge
@@ -113,6 +137,32 @@
             total={resources.gpu_resources[0].total_vram_bytes / 1_000_000_000}
           />
         {/if}
+
+        <!-- Server Control Button -->
+        <div style="margin-top: 12px;">
+          <button
+            onclick={toggleServer}
+            style="width: 100%; padding: 8px; background: {serverStatus?.running ? '#dc2626' : '#16a34a'}; border: none; color: white; font-size: 12px; font-weight: 600; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;"
+          >
+            {#if serverStatus?.running}
+              <svg style="width: 14px; height: 14px;" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="4" width="4" height="16" />
+                <rect x="14" y="4" width="4" height="16" />
+              </svg>
+              <span>Stop Server</span>
+            {:else}
+              <svg style="width: 14px; height: 14px;" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <span>Start Server</span>
+            {/if}
+          </button>
+          {#if serverStatus?.running}
+            <p style="font-size: 9px; color: #666; text-align: center; margin-top: 4px;">
+              {serverStatus.url}
+            </p>
+          {/if}
+        </div>
       {:else}
         <p style="font-size: 10px; color: #666; text-align: center;">Loading...</p>
       {/if}

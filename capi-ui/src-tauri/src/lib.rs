@@ -1,13 +1,14 @@
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{Emitter, State};
 use serde::Serialize;
 
 struct AppData {
     db: Arc<capi_core::Database>,
     registry: Arc<capi_core::Registry>,
     downloader: capi_core::Downloader,
+    sessions: Arc<Mutex<std::collections::HashMap<String, capi_core::InferenceSession>>>,
 }
 
 struct ServerState {
@@ -129,6 +130,113 @@ async fn download_model(
 }
 
 #[tauri::command]
+async fn remove_model(
+    model_id: String,
+    state: State<'_, AppData>,
+) -> Result<(), String> {
+    state.registry
+        .remove_model(&model_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn find_quantized_versions(
+    base_model_id: String,
+    state: State<'_, AppData>,
+) -> Result<Vec<capi_core::HuggingFaceModel>, String> {
+    state.downloader
+        .find_quantized_versions(&base_model_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Serialize)]
+struct FileInfoResponse {
+    name: String,
+    size: Option<u64>,
+}
+
+#[tauri::command]
+async fn fetch_model_files(
+    model_id: String,
+    state: State<'_, AppData>,
+) -> Result<Vec<FileInfoResponse>, String> {
+    let data = state.downloader
+        .fetch_model_data(&model_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(data.files_with_size.into_iter().map(|f| FileInfoResponse {
+        name: f.name,
+        size: f.size,
+    }).collect())
+}
+
+#[derive(Serialize, Clone)]
+struct DownloadProgress {
+    current: u64,
+    total: u64,
+    percent: f64,
+}
+
+#[tauri::command]
+async fn download_specific_file(
+    app: tauri::AppHandle,
+    model_id: String,
+    filename: String,
+    state: State<'_, AppData>,
+) -> Result<(), String> {
+    let config = capi_core::Config::load().map_err(|e| e.to_string())?;
+    let safe_name = model_id.replace("/", "_");
+    let model_path = config.models_dir.join(&safe_name);
+
+    std::fs::create_dir_all(&model_path).map_err(|e| e.to_string())?;
+
+    let url = format!("https://huggingface.co/{}/resolve/main/{}", model_id, filename);
+
+    state.downloader
+        .download_file_with_progress(&url, &model_path.join(&filename), move |current, total| {
+            if total > 0 {
+                let percent = (current as f64 / total as f64 * 100.0);
+                app.emit("download-progress", DownloadProgress {
+                    current,
+                    total,
+                    percent,
+                }).ok();
+            }
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Register model
+    let file_path = model_path.join(&filename);
+    let file_size = std::fs::metadata(&file_path).ok().map(|m| m.len() as i64);
+    let estimated_memory = file_size.map(|s| (s as f64 * 1.5) as i64);
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_secs() as i64;
+
+    let model_record = capi_core::db::ModelRecord {
+        id: safe_name.clone(),
+        name: model_id.split('/').last().unwrap_or(&model_id).to_string(),
+        path: file_path.to_string_lossy().to_string(),
+        size_bytes: file_size,
+        quantization: Some(filename.clone()),
+        context_length: None,
+        created_at: timestamp,
+        last_used: None,
+        estimated_memory_bytes: estimated_memory,
+        context_override: None,
+    };
+
+    state.registry.add_model(model_record).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn get_config() -> Result<capi_core::Config, String> {
     capi_core::Config::load().map_err(|e| e.to_string())
 }
@@ -152,6 +260,107 @@ struct GpuResourceResponse {
     name: String,
     total_vram_bytes: u64,
     available_vram_bytes: u64,
+}
+
+#[tauri::command]
+async fn load_model_direct(
+    model_id: String,
+    state: State<'_, AppData>,
+) -> Result<String, String> {
+    // Unload all previous models first
+    {
+        let mut sessions = state.sessions.lock()
+            .map_err(|_| "Failed to acquire sessions lock".to_string())?;
+        sessions.clear();
+    }
+
+    let model = state.registry.get_model(&model_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Model not found: {}", model_id))?;
+
+    let config = capi_core::Config::load().map_err(|e| e.to_string())?;
+    let devices = capi_core::detect_devices().map_err(|e| e.to_string())?;
+    let device = capi_core::select_best_device(&devices, &config.device_preference)
+        .unwrap_or_else(|| "CPU".to_string());
+
+    let model_path = std::path::Path::new(&model.path);
+
+    let mut session = capi_core::InferenceSession::load_with_lock(model_path, &device, &model_id)
+        .map_err(|e| e.to_string())?;
+
+    session.start_chat().map_err(|e| e.to_string())?;
+
+    let mut sessions = state.sessions.lock()
+        .map_err(|_| "Failed to acquire sessions lock".to_string())?;
+
+    sessions.insert(model_id.clone(), session);
+
+    Ok(format!("Model {} loaded on {}", model_id, device))
+}
+
+#[derive(Serialize, Clone)]
+struct ChatToken {
+    token: String,
+}
+
+#[derive(Serialize, Clone)]
+struct ChatMetrics {
+    tokens_per_second: f32,
+    time_to_first_token_ms: f32,
+    num_output_tokens: usize,
+}
+
+#[tauri::command]
+async fn chat_direct(
+    app: tauri::AppHandle,
+    model_id: String,
+    prompt: String,
+    state: State<'_, AppData>,
+) -> Result<ChatMetrics, String> {
+    let mut sessions = state.sessions.lock()
+        .map_err(|_| "Failed to acquire sessions lock".to_string())?;
+
+    let session = sessions.get_mut(&model_id)
+        .ok_or_else(|| format!("Model {} not loaded. Load it first.", model_id))?;
+
+    let (response, metrics) = session.generate_stream(&prompt, 4096, move |token| {
+        app.emit("chat-token", ChatToken { token: token.to_string() }).ok();
+        true
+    }).map_err(|e| e.to_string())?;
+
+    Ok(ChatMetrics {
+        tokens_per_second: metrics.tokens_per_second,
+        time_to_first_token_ms: metrics.time_to_first_token_ms,
+        num_output_tokens: metrics.num_output_tokens,
+    })
+}
+
+#[tauri::command]
+async fn preload_model(model_id: String) -> Result<String, String> {
+    let config = capi_core::Config::load().map_err(|e| e.to_string())?;
+    let url = format!("{}/v1/chat/completions", config.server_url());
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(300))  // 5 minutes for large models
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    // Make a minimal request to trigger model loading
+    let body = serde_json::json!({
+        "model": model_id,
+        "messages": [{"role": "user", "content": "test"}],
+        "max_tokens": 1,
+        "stream": false,
+    });
+
+    match client.post(&url)
+        .json(&body)
+        .send()
+        .await
+    {
+        Ok(_) => Ok("Model loaded".to_string()),
+        Err(e) => Err(format!("Failed to preload model: {}", e)),
+    }
 }
 
 #[tauri::command]
@@ -181,16 +390,33 @@ async fn get_system_resources() -> Result<SystemResourcesResponse, String> {
 fn get_cpu_usage() -> f32 {
     #[cfg(target_os = "linux")]
     {
-        if let Ok(stat) = std::fs::read_to_string("/proc/stat") {
-            if let Some(line) = stat.lines().next() {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() > 4 && parts[0] == "cpu" {
-                    let idle: f32 = parts[4].parse().unwrap_or(0.0);
-                    let total: f32 = parts[1..].iter()
-                        .filter_map(|s| s.parse::<f32>().ok())
-                        .sum();
-                    if total > 0.0 {
-                        return ((total - idle) / total * 100.0).min(100.0);
+        use std::thread;
+        use std::time::Duration;
+
+        if let Ok(stat1) = std::fs::read_to_string("/proc/stat") {
+            if let Some(line1) = stat1.lines().next() {
+                let parts1: Vec<&str> = line1.split_whitespace().collect();
+                if parts1.len() > 4 && parts1[0] == "cpu" {
+                    thread::sleep(Duration::from_millis(100));
+
+                    if let Ok(stat2) = std::fs::read_to_string("/proc/stat") {
+                        if let Some(line2) = stat2.lines().next() {
+                            let parts2: Vec<&str> = line2.split_whitespace().collect();
+                            if parts2.len() > 4 && parts2[0] == "cpu" {
+                                let idle1: f32 = parts1[4].parse().unwrap_or(0.0);
+                                let idle2: f32 = parts2[4].parse().unwrap_or(0.0);
+
+                                let total1: f32 = parts1[1..].iter().filter_map(|s| s.parse::<f32>().ok()).sum();
+                                let total2: f32 = parts2[1..].iter().filter_map(|s| s.parse::<f32>().ok()).sum();
+
+                                let total_diff = total2 - total1;
+                                let idle_diff = idle2 - idle1;
+
+                                if total_diff > 0.0 {
+                                    return ((total_diff - idle_diff) / total_diff * 100.0).min(100.0).max(0.0);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -223,11 +449,13 @@ pub fn run() {
 
     let registry = Arc::new(capi_core::Registry::new(db.clone()));
     let downloader = capi_core::Downloader::new();
+    let sessions = Arc::new(Mutex::new(std::collections::HashMap::new()));
 
     let app_data = AppData {
         db,
         registry,
         downloader,
+        sessions,
     };
 
     let server_state = ServerState {
@@ -246,9 +474,16 @@ pub fn run() {
             search_models,
             list_models,
             download_model,
+            remove_model,
+            find_quantized_versions,
+            fetch_model_files,
+            download_specific_file,
             get_config,
             save_config,
             get_system_resources,
+            preload_model,
+            load_model_direct,
+            chat_direct,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

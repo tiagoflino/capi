@@ -385,20 +385,7 @@ async fn main() -> Result<()> {
             let mut session = capi_core::InferenceSession::load(model_path, &device)?;
             session.start_chat()?;
 
-            print!("\r\n╭─────────────────────────────────────────────────────────╮\r\n");
-            print!("│ Model: {:<48} │\r\n", model_record.name);
-            print!("│ Device: {:<47} │\r\n", device);
-
-            let cpu = get_cpu_usage();
-            if let Ok(resources) = capi_core::detect_system_resources() {
-                let ram_used = (resources.total_ram_bytes - resources.available_ram_bytes) / 1_000_000_000;
-                let ram_total = resources.total_ram_bytes / 1_000_000_000;
-                print!("│ CPU: {:>3.0}%  RAM: {:.1}/{:.1} GB{:<27} │\r\n", cpu, ram_used, ram_total, "");
-            }
-
-            print!("╰─────────────────────────────────────────────────────────╯\r\n");
-            print!("\r\nType your message (or /exit to quit, ESC to stop generation)\r\n\r\n");
-            io::stdout().flush()?;
+            println!("Ready! Type your message (or /exit to quit, ESC to stop generation)\n");
 
             enable_raw_mode()?;
             use std::sync::{Arc as StdArc, atomic::{AtomicBool, Ordering}};
@@ -457,7 +444,6 @@ async fn main() -> Result<()> {
                 should_stop.store(false, Ordering::Relaxed);
                 let stop_clone = StdArc::clone(&should_stop);
                 let stop_clone_thread = StdArc::clone(&should_stop);
-                let stop_clone_status = StdArc::clone(&should_stop);
 
                 // ESC detection thread
                 let esc_handle = std::thread::spawn(move || {
@@ -475,33 +461,6 @@ async fn main() -> Result<()> {
                         }
                         if stop_clone_thread.load(Ordering::Relaxed) {
                             break;
-                        }
-                    }
-                });
-
-                print!("[Press ESC to stop generation]\r\n");
-                io::stdout().flush()?;
-
-                // Status updater thread
-                let status_handle = std::thread::spawn(move || {
-                    // Calculate absolute line position (header is at top of terminal)
-                    use std::io::Write;
-
-                    while !stop_clone_status.load(Ordering::Relaxed) {
-                        std::thread::sleep(std::time::Duration::from_secs(1));
-
-                        if let Ok(resources) = capi_core::detect_system_resources() {
-                            let ram_used = (resources.total_ram_bytes - resources.available_ram_bytes) / 1_000_000_000;
-                            let ram_total = resources.total_ram_bytes / 1_000_000_000;
-                            let cpu = get_cpu_usage();
-
-                            // Save cursor position, move to header line, update, restore
-                            eprint!("\x1b[s");  // Save cursor (alternative)
-                            eprint!("\x1b[1;1H");  // Move to top-left
-                            eprint!("\x1b[4B");  // Move down 4 lines to stats line
-                            eprint!("│ CPU: {:>3.0}%  RAM: {:.1}/{:.1} GB{:<27} │", cpu, ram_used, ram_total, "");
-                            eprint!("\x1b[u");  // Restore cursor
-                            std::io::stderr().flush().ok();
                         }
                     }
                 });
@@ -536,7 +495,6 @@ async fn main() -> Result<()> {
 
                 should_stop.store(true, Ordering::Relaxed);
                 esc_handle.join().ok();
-                status_handle.join().ok();
 
                 print!("\r\n({:.1} tok/s, {} tokens)\r\n\r\n", metrics.tokens_per_second, metrics.num_output_tokens);
                 io::stdout().flush()?;
