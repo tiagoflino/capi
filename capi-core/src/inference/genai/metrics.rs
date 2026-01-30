@@ -1,75 +1,54 @@
-use super::{ffi, check_status, Result};
+//! Performance metrics from OpenVINO GenAI.
 
+use crate::genai_bridge::ffi::PerfMetricsData;
+
+/// Performance metrics collected during text generation.
+#[derive(Debug, Clone)]
 pub struct PerfMetrics {
-    raw: *mut ffi::ov_genai_perf_metrics,
+    data: PerfMetricsData,
 }
-
-unsafe impl Send for PerfMetrics {}
-unsafe impl Sync for PerfMetrics {}
 
 impl PerfMetrics {
-    pub(crate) fn from_raw(raw: *mut ffi::ov_genai_perf_metrics) -> Self {
-        Self { raw }
+    /// Create PerfMetrics from FFI data.
+    pub(crate) fn from_data(data: PerfMetricsData) -> Self {
+        Self { data }
     }
 
-    pub fn load_time(&self) -> Result<f32> {
-        unsafe {
-            let mut time = 0.0f32;
-            check_status(ffi::ov_genai_perf_metrics_get_load_time(self.raw, &mut time))?;
-            Ok(time)
-        }
+    /// Get the model load time in milliseconds.
+    pub fn load_time(&self) -> f32 {
+        self.data.load_time
     }
 
-    pub fn num_input_tokens(&self) -> Result<usize> {
-        unsafe {
-            let mut count = 0usize;
-            check_status(ffi::ov_genai_perf_metrics_get_num_input_tokens(self.raw, &mut count))?;
-            Ok(count)
-        }
+    /// Get the number of tokens in the input prompt.
+    pub fn num_input_tokens(&self) -> usize {
+        self.data.num_input_tokens
     }
 
-    pub fn num_generated_tokens(&self) -> Result<usize> {
-        unsafe {
-            let mut count = 0usize;
-            check_status(ffi::ov_genai_perf_metrics_get_num_generation_tokens(self.raw, &mut count))?;
-            Ok(count)
-        }
+    /// Get the number of tokens generated.
+    pub fn num_generated_tokens(&self) -> usize {
+        self.data.num_generated_tokens
     }
 
-    pub fn ttft(&self) -> Result<(f32, f32)> {
-        unsafe {
-            let mut mean = 0.0f32;
-            let mut std = 0.0f32;
-            check_status(ffi::ov_genai_perf_metrics_get_ttft(self.raw, &mut mean, &mut std))?;
-            Ok((mean, std))
-        }
+    /// Get Time To First Token (TTFT) as (mean, std) in milliseconds.
+    pub fn ttft(&self) -> (f32, f32) {
+        (self.data.ttft_mean, self.data.ttft_std)
     }
 
-    pub fn throughput(&self) -> Result<(f32, f32)> {
-        unsafe {
-            let mut mean = 0.0f32;
-            let mut std = 0.0f32;
-            check_status(ffi::ov_genai_perf_metrics_get_throughput(self.raw, &mut mean, &mut std))?;
-            Ok((mean, std))
-        }
+    /// Get throughput as (mean, std) in tokens per second.
+    pub fn throughput(&self) -> (f32, f32) {
+        (self.data.throughput_mean, self.data.throughput_std)
     }
 
-    pub fn generate_duration(&self) -> Result<(f32, f32)> {
-        unsafe {
-            let mut mean = 0.0f32;
-            let mut std = 0.0f32;
-            check_status(ffi::ov_genai_perf_metrics_get_generate_duration(self.raw, &mut mean, &mut std))?;
-            Ok((mean, std))
-        }
+    /// Get generation duration as (mean, std) in milliseconds.
+    pub fn generate_duration(&self) -> (f32, f32) {
+        (self.data.generate_duration_mean, self.data.generate_duration_std)
     }
 }
 
-impl Drop for PerfMetrics {
-    fn drop(&mut self) {
-        unsafe {
-            if !self.raw.is_null() {
-                ffi::ov_genai_decoded_results_perf_metrics_free(self.raw);
-            }
+impl Default for PerfMetrics {
+    fn default() -> Self {
+        Self {
+            data: PerfMetricsData::default(),
         }
     }
 }

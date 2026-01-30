@@ -83,6 +83,7 @@ fn detect_intel_gpu() -> Option<GpuResource> {
 }
 
 /// Detect Intel GPU using xe driver sysfs paths (Meteor Lake, Lunar Lake, etc.)
+#[cfg(target_os = "linux")]
 fn detect_intel_gpu_xe() -> Option<GpuResource> {
 
     for card in 0..10 {
@@ -129,15 +130,32 @@ fn detect_intel_gpu_xe() -> Option<GpuResource> {
         let gpu_name = get_intel_gpu_name(&device_id);
 
         // For integrated GPUs, use system RAM as shared memory
-        let mut sys = System::new_all();
+        let mut sys = System::new(); // Don't need new_all, just memory
         sys.refresh_memory();
-        let total_vram = sys.total_memory() / 2; // Approximate shared memory
-        let available_vram = sys.available_memory() / 2;
+        
+        let mut available_vram = sys.available_memory();
+        let total_vram = sys.total_memory();
+        
+        // Fallback: if sysinfo available_memory is 0 but total is not, 
+        // it might be a parsing issue. Try free_memory.
+        if available_vram == 0 && total_vram > 0 {
+            available_vram = sys.free_memory();
+        }
+        
+        // If still 0, use a conservative 25% of total as "available" 
+        // to avoid blocking user completely if detection fails
+        if available_vram == 0 && total_vram > 0 {
+            available_vram = total_vram / 4;
+        }
+
+        // Shared memory is typically up to 50% of system RAM
+        let gpu_total = total_vram / 2;
+        let gpu_available = available_vram.min(gpu_total);
 
         return Some(GpuResource {
             name: gpu_name,
-            total_vram_bytes: total_vram,
-            available_vram_bytes: available_vram,
+            total_vram_bytes: gpu_total,
+            available_vram_bytes: gpu_available,
             device_type: DeviceType::GPU,
             usage_percent,
             frequency_mhz: act_freq,

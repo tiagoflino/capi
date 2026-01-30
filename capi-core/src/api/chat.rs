@@ -135,7 +135,7 @@ async fn create_non_streaming_response(
 
     drop(cache);
 
-    let session_guard = session.read().await;
+    let mut session_guard = session.write().await;
 
     let conversation: String = payload.messages.iter()
         .map(|m| format!("{}: {}",
@@ -226,8 +226,9 @@ fn create_streaming_response(
 
         drop(cache);
 
-        let session_guard = session.read().await;
-
+        // We don't need to hold the lock here, as spawn_blocking will acquire its own.
+        // Holding it here would cause a deadlock with blocking_write below.
+        
         let conversation: String = payload.messages.iter()
             .map(|m| format!("{}: {}", if m.role == "user" { "User" } else { "Assistant" }, m.content))
             .collect::<Vec<_>>()
@@ -251,7 +252,7 @@ fn create_streaming_response(
         let prompt_clone = full_prompt.clone();
 
         tokio::task::spawn_blocking(move || {
-            let session_guard = session_clone.blocking_read();
+            let mut session_guard = session_clone.blocking_write();
             session_guard.generate_stream(&prompt_clone, max_tokens, move |token| {
                 tx.send(token.to_string()).ok();
                 true
@@ -282,7 +283,8 @@ fn create_streaming_response(
             yield Ok(Event::default().data(json));
         }
 
-        drop(session_guard);
+        // drop(session_guard); - removed as not acquired
+
 
         let final_chunk = ChatCompletionChunk {
             id: id.clone(),

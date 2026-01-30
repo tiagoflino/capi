@@ -109,7 +109,6 @@
     downloading = true;
     downloadProgress = 0;
 
-    // Listen for download progress
     const unlisten = await listen('download-progress', (event: any) => {
       downloadProgress = event.payload.percent;
     });
@@ -162,97 +161,87 @@
   }
 </script>
 
-<div style="height: 100%; overflow-y: auto;">
-  <div style="padding: 32px; max-width: 1200px; margin: 0 auto;">
-    <h1 style="font-size: 32px; font-weight: bold; margin-bottom: 32px;">Models</h1>
+<div class="models-page">
+  <div class="content-container">
+    <header class="section-header">
+      <h1>Model Repository</h1>
+      <p>Manage and discover large language models</p>
+    </header>
 
     <!-- Installed Models -->
-    <section style="margin-bottom: 48px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-        <h2 style="font-size: 20px; font-weight: 600; color: #e5e5e5;">Installed Models</h2>
-        <button onclick={loadModels} style="font-size: 13px; color: #888; background: none; border: none; cursor: pointer;">Refresh</button>
+    <section class="models-section">
+      <div class="section-top">
+        <h2 class="section-title">Installed Assets</h2>
+        <button onclick={loadModels} class="refresh-btn">Refresh Registry</button>
       </div>
 
       {#if loading}
-        <div style="background: #181818; border-radius: 12px; padding: 48px; text-align: center;">
-          <div style="display: inline-block; width: 32px; height: 32px; border: 4px solid #282828; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-          <p style="color: #888; margin-top: 16px;">Loading models...</p>
+        <div class="placeholder-card loading">
+          <div class="spinner"></div>
+          <p>Scanning local storage...</p>
         </div>
       {:else if models.length === 0}
-        <div style="background: #181818; border: 1px solid #282828; border-radius: 12px; padding: 48px; text-align: center;">
-          <svg style="width: 64px; height: 64px; margin: 0 auto 16px; color: #404040;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <p style="color: #888; margin-bottom: 8px;">No models installed</p>
-          <p style="font-size: 14px; color: #666;">Search and download models below</p>
+        <div class="placeholder-card empty">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+          </div>
+          <p>No models indexed</p>
+          <span class="sub-placeholder">Search and deploy models from HuggingFace below.</span>
         </div>
       {:else}
-        <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="model-list">
           {#each models as model}
-            <div style="background: #181818; border: 1px solid #282828; border-radius: 12px; padding: 16px; transition: background 0.2s;">
-              <div style="display: flex; align-items: center; justify-between;">
-                <div style="flex: 1;">
-                  <h3 style="font-weight: 500; color: white; margin-bottom: 6px; font-size: 15px;">{model.name}</h3>
-                  <div style="display: flex; align-items: center; gap: 12px; font-size: 13px; color: #888;">
-                    <span>{model.quantization || '-'}</span>
-                    <span>•</span>
-                    <span>{formatSize(model.size_bytes)}</span>
-                    {#if model.estimated_memory_bytes}
-                      <span>•</span>
-                      <span style="color: #60a5fa;">~{formatSize(model.estimated_memory_bytes)} RAM</span>
-                    {/if}
-                  </div>
+            <div class="model-item">
+              <div class="model-main">
+                <h3>{model.name}</h3>
+                <div class="model-meta">
+                  <span class="tag">{model.quantization || 'GGUF'}</span>
+                  <span class="dot"></span>
+                  <span>{formatSize(model.size_bytes)}</span>
+                  {#if model.estimated_memory_bytes}
+                    <span class="dot"></span>
+                    <span class="memory-estimate">~{formatSize(model.estimated_memory_bytes)} VRAM</span>
+                  {/if}
                 </div>
-                <button
-                  onclick={() => removeModel(model.id)}
-                  style="padding: 8px 16px; font-size: 13px; color: #f87171; background: transparent; border: none; border-radius: 8px; cursor: pointer;"
-                >
-                  Remove
-                </button>
               </div>
+              <button onclick={() => removeModel(model.id)} class="delete-btn">Eject</button>
             </div>
           {/each}
         </div>
       {/if}
     </section>
 
-    <!-- Search Models -->
-    <section>
-      <h2 style="font-size: 20px; font-weight: 600; color: #e5e5e5; margin-bottom: 16px;">Discover Models</h2>
+    <!-- Discovery Section -->
+    <section class="discovery-section">
+      <h2 class="section-title">Model Discovery</h2>
 
-      <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+      <div class="search-bar">
         <input
           type="text"
           bind:value={searchQuery}
-          placeholder="Search HuggingFace models..."
-          style="flex: 1; padding: 12px 16px; background: #282828; border: 1px solid #404040; border-radius: 12px; color: white; font-size: 14px;"
+          placeholder="Search HuggingFace..."
           onkeydown={(e) => e.key === 'Enter' && searchModels()}
         />
         <button
           onclick={searchModels}
           disabled={searching || !searchQuery.trim()}
-          style="padding: 12px 32px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); border: none; color: white; font-weight: 600; border-radius: 12px; cursor: pointer; font-size: 14px; opacity: {searching || !searchQuery.trim() ? '0.3' : '1'};"
+          class="search-btn"
         >
-          {searching ? 'Searching...' : 'Search'}
+          {searching ? 'Probing...' : 'Search'}
         </button>
       </div>
 
       {#if searchResults.length > 0}
-        <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="discovery-list">
           {#each searchResults as result}
-            <div style="background: #181818; border: 1px solid #282828; border-radius: 12px; padding: 16px; transition: background 0.2s;">
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="flex: 1;">
-                  <h3 style="font-weight: 500; color: white; margin-bottom: 6px; font-size: 15px;">{result.id}</h3>
-                  <p style="font-size: 13px; color: #888;">↓ {result.downloads.toLocaleString()} downloads</p>
-                </div>
-                <button
-                  onclick={() => browseModel(result)}
-                  style="padding: 10px 24px; background: #16a34a; color: white; font-weight: 600; border: none; border-radius: 12px; cursor: pointer; font-size: 14px;"
-                >
-                  Browse
-                </button>
+            <div class="discovery-item">
+              <div class="discovery-main">
+                <h3>{result.id}</h3>
+                <p class="downloads-count">↓ {result.downloads.toLocaleString()} pull requests</p>
               </div>
+              <button onclick={() => browseModel(result)} class="browse-btn">Deploy</button>
             </div>
           {/each}
         </div>
@@ -261,95 +250,134 @@
   </div>
 </div>
 
-<!-- Quantized Versions Modal -->
-<Modal isOpen={showQuantModal} onClose={() => showQuantModal = false} title="Select Quantized Version">
-  {#snippet children()}
-    {#if loadingQuants}
-      <div style="text-align: center; padding: 48px;">
-        <div style="display: inline-block; width: 32px; height: 32px; border: 4px solid #282828; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-        <p style="color: #888; margin-top: 16px;">Finding quantized versions...</p>
-      </div>
-    {:else if quantizedVersions.length === 0}
-      <div style="text-align: center; padding: 48px;">
-        <p style="color: #888;">No quantized GGUF versions found</p>
-        <p style="font-size: 13px; color: #666; margin-top: 8px;">Try using the base model directly or search for a different model</p>
-      </div>
-    {:else}
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        {#each quantizedVersions as quant}
-          <button
-            onclick={() => selectQuantVersion(quant)}
-            style="text-align: left; background: #181818; border: 1px solid #282828; border-radius: 8px; padding: 16px; cursor: pointer; transition: background 0.2s;"
-          >
-            <h3 style="font-weight: 500; color: white; margin-bottom: 6px; font-size: 15px;">{quant.id}</h3>
-            <p style="font-size: 13px; color: #888;">↓ {quant.downloads.toLocaleString()} downloads</p>
-          </button>
-        {/each}
-      </div>
-    {/if}
-  {/snippet}
+<Modal isOpen={showQuantModal} onClose={() => showQuantModal = false} title="Select Quantization Hierarchy">
+  {#if loadingQuants}
+    <div class="modal-loading">
+      <div class="spinner"></div>
+      <p>Fetching quantized artifacts...</p>
+    </div>
+  {:else if quantizedVersions.length === 0}
+    <div class="modal-empty">
+      <p>No valid GGUF artifacts found</p>
+      <span>Try a different base model or quantization provider.</span>
+    </div>
+  {:else}
+    <div class="selection-list">
+      {#each quantizedVersions as quant}
+        <button onclick={() => selectQuantVersion(quant)} class="selection-item">
+          <div class="selection-info">
+            <span class="s-id">{quant.id}</span>
+            <span class="s-dl">↓ {quant.downloads.toLocaleString()} downloads</span>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      {/each}
+    </div>
+  {/if}
 </Modal>
 
-<!-- GGUF Files Modal -->
-<Modal isOpen={showFileModal} onClose={() => showFileModal = false} title="Select Quantization">
-  {#snippet children()}
-    {#if downloading}
-      <div style="text-align: center; padding: 48px;">
-        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 24px;">Downloading...</h3>
-        <div style="width: 100%; max-width: 400px; margin: 0 auto;">
-          <div style="height: 8px; background: #282828; border-radius: 4px; overflow: hidden;">
-            <div style="width: {downloadProgress}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 0.3s;"></div>
-          </div>
-          <p style="color: #888; margin-top: 12px; font-size: 14px;">{downloadProgress.toFixed(1)}%</p>
+<Modal isOpen={showFileModal} onClose={() => showFileModal = false} title="Deployment Specification">
+  {#if downloading}
+    <div class="download-state">
+      <h3 class="dl-title">Transferring Neural Weights</h3>
+      <div class="progress-wrap">
+        <div class="dl-track">
+          <div class="dl-fill" style="width: {downloadProgress}%;"></div>
         </div>
+        <span class="dl-percent">{downloadProgress.toFixed(1)}%</span>
       </div>
-    {:else if loadingFiles}
-      <div style="text-align: center; padding: 48px;">
-        <div style="display: inline-block; width: 32px; height: 32px; border: 4px solid #282828; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-        <p style="color: #888; margin-top: 16px;">Loading files...</p>
-      </div>
-    {:else if modelFiles.length === 0}
-      <div style="text-align: center; padding: 48px;">
-        <p style="color: #888;">No GGUF files found</p>
-      </div>
-    {:else}
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        {#each modelFiles as file}
-          <button
-            onclick={() => downloadFile(file.name)}
-            disabled={downloading}
-            style="text-align: left; background: #181818; border: 1px solid #282828; border-radius: 8px; padding: 16px; cursor: pointer; transition: background 0.2s; opacity: {downloading ? '0.5' : '1'};"
-          >
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <h3 style="font-weight: 500; color: white; font-size: 14px;">
-                  {extractQuantization(file.name) || 'Unknown'} - {file.name}
-                </h3>
-                <p style="font-size: 13px; color: #888; margin-top: 4px;">
-                  {file.size ? `${(file.size / 1_000_000_000).toFixed(1)} GB` : 'Size unknown'}
-                </p>
-              </div>
-              <svg style="width: 20px; height: 20px; color: #16a34a;" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-              </svg>
-            </div>
-          </button>
-        {/each}
-      </div>
-    {/if}
-  {/snippet}
+    </div>
+  {:else if loadingFiles}
+    <div class="modal-loading">
+      <div class="spinner"></div>
+      <p>Indexing remote weights...</p>
+    </div>
+  {:else if modelFiles.length === 0}
+    <div class="modal-empty"><p>No compatible GGUF weights found</p></div>
+  {:else}
+    <div class="selection-list">
+      {#each modelFiles as file}
+        <button onclick={() => downloadFile(file.name)} disabled={downloading} class="selection-item compact">
+          <div class="selection-info">
+            <span class="s-quant">{extractQuantization(file.name) || 'Unknown'}</span>
+            <span class="s-filename">{file.name}</span>
+          </div>
+          <div class="selection-right">
+            <span class="s-size">{file.size ? formatSize(file.size) : '???'}</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 15l-4-4h8l-4 4zm0-12v12" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M5 19h14v2H5z" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </button>
+      {/each}
+    </div>
+  {/if}
 </Modal>
 
 <style>
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+  .models-page { height: 100%; overflow-y: auto; background: #fcfaf7; padding-bottom: 100px; }
+  .content-container { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
 
-  button:hover:not(:disabled) {
-    opacity: 0.9;
-  }
+  .section-header { margin-bottom: 48px; }
+  .section-header h1 { font-size: 32px; font-weight: 800; color: #3d3b38; letter-spacing: -0.03em; margin-bottom: 8px; }
+  .section-header p { color: #8c8984; font-size: 16px; font-weight: 500; }
 
-  div:has(> div > h3):hover {
-    background: #282828 !important;
-  }
+  .section-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .section-title { font-size: 20px; font-weight: 800; color: #3d3b38; letter-spacing: -0.02em; }
+  .refresh-btn { background: none; border: none; color: #b87333; font-size: 12px; font-weight: 800; text-transform: uppercase; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; }
+  .refresh-btn:hover { opacity: 1; }
+
+  .placeholder-card { background: white; border: 1px solid rgba(0,0,0,0.05); border-radius: 20px; padding: 60px 20px; text-align: center; }
+  .empty-icon { width: 64px; height: 64px; margin: 0 auto 20px; color: #fae8d1; }
+  .placeholder-card p { font-size: 16px; font-weight: 700; color: #3d3b38; margin-bottom: 4px; }
+  .sub-placeholder { font-size: 14px; color: #8c8984; }
+
+  .model-list { display: flex; flex-direction: column; gap: 12px; }
+  .model-item { background: white; border: 1px solid rgba(0,0,0,0.05); border-radius: 16px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+  .model-main h3 { font-size: 15px; font-weight: 800; color: #3d3b38; margin-bottom: 4px; }
+  .model-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #8c8984; font-family: monospace; }
+  .tag { background: #fae8d1; color: #b87333; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; }
+  .dot { width: 3px; height: 3px; background: #dcdad7; border-radius: 50%; }
+  .memory-estimate { color: #369b7d; }
+  .delete-btn { background: #fee2e2; color: #dc2626; border: none; padding: 6px 14px; border-radius: 10px; font-size: 11px; font-weight: 800; cursor: pointer; transition: all 0.2s; }
+  .delete-btn:hover { background: #fecaca; transform: translateY(-1px); }
+
+  .search-bar { display: flex; gap: 12px; margin: 24px 0 32px; }
+  .search-bar input { flex: 1; padding: 14px 20px; background: white; border: 1px solid rgba(0,0,0,0.05); border-radius: 16px; font-size: 15px; outline: none; box-shadow: 0 4px 12px rgba(0,0,0,0.02); transition: border-color 0.2s; }
+  .search-bar input:focus { border-color: #b87333; }
+  .search-btn { background: #3d3b38; color: white; border: none; padding: 0 28px; border-radius: 16px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .search-btn:hover:not(:disabled) { background: #000; transform: translateY(-1px); }
+  .search-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .discovery-list { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .discovery-item { background: white; border: 1px solid rgba(0,0,0,0.05); border-radius: 16px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .discovery-main h3 { font-size: 14px; font-weight: 700; color: #3d3b38; margin-bottom: 2px; }
+  .downloads-count { font-size: 11px; color: #8c8984; font-weight: 600; }
+  .browse-btn { background: #3d3b38; color: white; border: none; padding: 8px 18px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .browse-btn:hover { background: #000; transform: scale(1.03); }
+
+  .selection-list { display: flex; flex-direction: column; gap: 8px; }
+  .selection-item { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: #faf8f5; border: 1px solid rgba(0,0,0,0.05); border-radius: 14px; cursor: pointer; transition: all 0.2s; text-align: left; width: 100%; color: inherit; }
+  .selection-item:hover { background: #fae8d1; border-color: #b87333; transform: translateX(4px); }
+  .selection-info { display: flex; flex-direction: column; gap: 4px; }
+  .s-id { font-size: 14px; font-weight: 700; color: #3d3b38; }
+  .s-dl { font-size: 11px; color: #8c8984; }
+  .s-quant { font-weight: 800; color: #b87333; font-size: 12px; font-family: monospace; }
+  .s-filename { font-size: 12px; color: #8c8984; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
+  .selection-right { display: flex; align-items: center; gap: 12px; }
+  .s-size { font-size: 12px; font-weight: 700; color: #3d3b38; }
+
+  .modal-loading { text-align: center; padding: 40px 0; color: #8c8984; }
+  .download-state { text-align: center; padding: 20px 0; }
+  .dl-title { font-size: 18px; font-weight: 800; color: #3d3b38; margin-bottom: 24px; }
+  .progress-wrap { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .dl-track { width: 100%; height: 8px; background: #faf8f5; border-radius: 4px; overflow: hidden; }
+  .dl-fill { height: 100%; background: #b87333; border-radius: 4px; transition: width 0.3s; }
+  .dl-percent { font-size: 14px; font-weight: 800; color: #b87333; }
+
+  .spinner { width: 24px; height: 24px; border: 3px solid rgba(184, 115, 51, 0.1); border-top-color: #b87333; border-radius: 50%; margin: 0 auto 16px; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>

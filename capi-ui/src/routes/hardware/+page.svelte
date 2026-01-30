@@ -39,7 +39,6 @@
     await loadHardware();
     await loadResources();
     
-    // Refresh resources every 2 seconds
     refreshInterval = setInterval(async () => {
       await loadResources();
     }, 2000);
@@ -75,105 +74,108 @@
   }
 </script>
 
-<div style="height: 100%; overflow-y: auto;">
-  <div style="padding: 32px; max-width: 900px; margin: 0 auto;">
-    <h1 style="font-size: 32px; font-weight: bold; margin-bottom: 32px;">Hardware</h1>
+<div class="hardware-page">
+  <div class="content-container">
+    <header class="section-header">
+      <h1>Hardware Architecture</h1>
+      <p>Real-time telemetry and device monitoring</p>
+    </header>
 
     {#if loading}
-      <div style="text-align: center; padding: 48px;">
-        <div style="display: inline-block; width: 32px; height: 32px; border: 4px solid #282828; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-        <p style="color: #888; margin-top: 16px;">Detecting hardware...</p>
+      <div class="loading-container">
+        <div class="spinner"></div>
+        <p>Probing hardware interfaces...</p>
       </div>
     {:else}
-      <div style="display: flex; flex-direction: column; gap: 24px;">
-        <!-- GPU Status Card -->
+      <div class="hardware-grid">
+        <!-- GPU Elevation -->
         {#if resources && resources.gpu_resources.length > 0}
           {#each resources.gpu_resources as gpu}
-            <div style="background: linear-gradient(135deg, #0f172a, #1e1b4b); border: 1px solid #3b82f6; border-radius: 16px; padding: 24px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="font-size: 20px; font-weight: 600; color: white;">{gpu.name}</h2>
-                <span style="background: #22c55e; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">ACTIVE</span>
+            <div class="card gpu-card">
+              <div class="card-header">
+                <div>
+                  <h2 class="card-title">{gpu.name}</h2>
+                  <span class="card-subtitle">Integrated Graphics</span>
+                </div>
+                <div class="badge {gpu.usage_percent > 0 ? 'active' : ''}">
+                  {gpu.usage_percent > 0 ? 'ACTIVE' : 'IDLE'}
+                </div>
               </div>
               
-              <!-- GPU Usage -->
-              <div style="margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                  <span style="color: #94a3b8; font-size: 14px;">GPU Usage</span>
-                  <span style="color: white; font-weight: 600; font-size: 14px;">{gpu.usage_percent.toFixed(1)}%</span>
+              <div class="metric-group">
+                <div class="metric-meta">
+                  <span>Utilization</span>
+                  <span class="value">{gpu.usage_percent.toFixed(1)}%</span>
                 </div>
-                <div style="background: #1e293b; border-radius: 8px; height: 12px; overflow: hidden;">
-                  <div style="background: linear-gradient(90deg, #3b82f6, #8b5cf6); height: 100%; width: {gpu.usage_percent}%; transition: width 0.5s ease;"></div>
-                </div>
-              </div>
-
-              <!-- GPU Frequency -->
-              <div style="margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                  <span style="color: #94a3b8; font-size: 14px;">Frequency</span>
-                  <span style="color: white; font-weight: 600; font-size: 14px;">{gpu.frequency_mhz} / {gpu.max_frequency_mhz} MHz</span>
-                </div>
-                <div style="background: #1e293b; border-radius: 8px; height: 12px; overflow: hidden;">
-                  <div style="background: linear-gradient(90deg, #10b981, #06b6d4); height: 100%; width: {gpu.max_frequency_mhz > 0 ? (gpu.frequency_mhz / gpu.max_frequency_mhz * 100) : 0}%; transition: width 0.5s ease;"></div>
+                <div class="progress-track">
+                  <div class="progress-fill accent" style="width: {gpu.usage_percent}%;"></div>
                 </div>
               </div>
 
-              <!-- Memory -->
-              <div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                  <span style="color: #94a3b8; font-size: 14px;">Shared Memory</span>
-                  <span style="color: white; font-weight: 600; font-size: 14px;">
-                    {formatBytes(gpu.total_vram_bytes - gpu.available_vram_bytes)} / {formatBytes(gpu.total_vram_bytes)}
-                  </span>
+              <div class="metric-group">
+                <div class="metric-meta">
+                  <span>Engine Clock</span>
+                  <span class="value">{gpu.frequency_mhz} MHz</span>
                 </div>
-                <div style="background: #1e293b; border-radius: 8px; height: 12px; overflow: hidden;">
-                  <div style="background: linear-gradient(90deg, #f59e0b, #ef4444); height: 100%; width: {((gpu.total_vram_bytes - gpu.available_vram_bytes) / gpu.total_vram_bytes * 100)}%; transition: width 0.5s ease;"></div>
+                <div class="progress-track">
+                  <div class="progress-fill green" style="width: {gpu.max_frequency_mhz > 0 ? (gpu.frequency_mhz / gpu.max_frequency_mhz * 100) : 0}%;"></div>
+                </div>
+              </div>
+
+              <div class="metric-group">
+                <div class="metric-meta">
+                  <span>VRAM Allocation</span>
+                  <span class="value">{formatBytes(gpu.total_vram_bytes - gpu.available_vram_bytes)} / {formatBytes(gpu.total_vram_bytes)}</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill red" style="width: {((gpu.total_vram_bytes - gpu.available_vram_bytes) / gpu.total_vram_bytes * 100)}%;"></div>
                 </div>
               </div>
             </div>
           {/each}
-        {:else}
-          <div style="background: #181818; border: 1px solid #282828; border-radius: 12px; padding: 24px; text-align: center;">
-            <p style="color: #888;">No GPU detected</p>
-          </div>
         {/if}
 
-        <!-- CPU & RAM Status -->
-        {#if resources}
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-            <div style="background: #181818; border: 1px solid #282828; border-radius: 12px; padding: 20px;">
-              <h3 style="font-size: 14px; color: #888; margin-bottom: 12px;">CPU Usage</h3>
-              <div style="font-size: 28px; font-weight: bold; color: white;">{resources.cpu_usage_percent.toFixed(1)}%</div>
-              <div style="background: #282828; border-radius: 4px; height: 6px; margin-top: 12px; overflow: hidden;">
-                <div style="background: #3b82f6; height: 100%; width: {resources.cpu_usage_percent}%;"></div>
+        <div class="stats-row">
+          {#if resources}
+            <div class="card stat-card">
+              <span class="stat-label">CPU LOAD</span>
+              <div class="stat-main">
+                <span class="stat-value">{resources.cpu_usage_percent.toFixed(1)}</span>
+                <span class="stat-unit">%</span>
+              </div>
+              <div class="mini-progress">
+                <div class="mini-fill" style="width: {resources.cpu_usage_percent}%;"></div>
               </div>
             </div>
-            <div style="background: #181818; border: 1px solid #282828; border-radius: 12px; padding: 20px;">
-              <h3 style="font-size: 14px; color: #888; margin-bottom: 12px;">RAM Usage</h3>
-              <div style="font-size: 28px; font-weight: bold; color: white;">
-                {formatBytes(resources.total_ram_bytes - resources.available_ram_bytes)}
+
+            <div class="card stat-card">
+              <span class="stat-label">MEMORY PRESSURE</span>
+              <div class="stat-main">
+                <span class="stat-value">{formatBytes(resources.total_ram_bytes - resources.available_ram_bytes).split(' ')[0]}</span>
+                <span class="stat-unit">{formatBytes(resources.total_ram_bytes - resources.available_ram_bytes).split(' ')[1]}</span>
               </div>
-              <div style="background: #282828; border-radius: 4px; height: 6px; margin-top: 12px; overflow: hidden;">
-                <div style="background: #8b5cf6; height: 100%; width: {((resources.total_ram_bytes - resources.available_ram_bytes) / resources.total_ram_bytes * 100)}%;"></div>
+              <div class="mini-progress">
+                <div class="mini-fill" style="width: {((resources.total_ram_bytes - resources.available_ram_bytes) / resources.total_ram_bytes * 100)}%;"></div>
               </div>
-              <p style="font-size: 12px; color: #666; margin-top: 8px;">
-                {formatBytes(resources.available_ram_bytes)} available of {formatBytes(resources.total_ram_bytes)}
-              </p>
+              <p class="stat-subtext">{formatBytes(resources.available_ram_bytes)} free of {formatBytes(resources.total_ram_bytes)}</p>
             </div>
-          </div>
-        {/if}
+          {/if}
+        </div>
 
         <!-- Available Devices -->
         {#if hardwareStatus}
-          <div style="background: #181818; border: 1px solid #282828; border-radius: 12px; padding: 24px;">
-            <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">Available Devices</h2>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div class="card devices-card">
+            <h2 class="card-title-small">Connected Backend Devices</h2>
+            <div class="device-list">
               {#each hardwareStatus.available_devices as device}
-                <div style="display: flex; align-items: center; gap: 12px;">
-                  <div style="width: 12px; height: 12px; border-radius: 50%; background: {device.available ? '#22c55e' : '#ef4444'};"></div>
-                  <span style="color: white; font-size: 15px; font-weight: 500;">{device.name}</span>
-                  <span style="color: #666; font-size: 13px;">({device.device_type})</span>
+                <div class="device-item">
+                  <div class="status-indicator {device.available ? 'available' : 'unavailable'}"></div>
+                  <div class="device-info">
+                    <span class="d-name">{device.name}</span>
+                    <span class="d-type">{device.device_type}</span>
+                  </div>
                   {#if resources?.selected_device === device.name}
-                    <span style="background: #3b82f6; color: white; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;">IN USE</span>
+                    <span class="in-use-pill">Primary</span>
                   {/if}
                 </div>
               {/each}
@@ -186,7 +188,107 @@
 </div>
 
 <style>
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+  .hardware-page {
+    height: 100%;
+    overflow-y: auto;
+    background: #fcfaf7;
+    padding-bottom: 80px;
   }
+
+  .content-container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  .section-header {
+    margin-bottom: 40px;
+    animation: fadeInDown 0.6s ease-out;
+  }
+
+  .section-header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #3d3b38;
+    margin-bottom: 8px;
+  }
+
+  .section-header p {
+    color: #8c8984;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  .card {
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    transition: transform 0.2s;
+  }
+
+  .gpu-card {
+    margin-bottom: 24px;
+    border-top: 4px solid #b87333;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+
+  .card-title { font-size: 20px; font-weight: 800; color: #3d3b38; }
+  .card-subtitle { font-size: 12px; font-weight: 600; color: #8c8984; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    background: #f2f2f7;
+    color: #8c8984;
+  }
+  .badge.active { background: #dcfce7; color: #16a34a; }
+
+  .metric-group { margin-bottom: 20px; }
+  .metric-meta { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #8c8984; margin-bottom: 6px; }
+  .metric-meta .value { color: #3d3b38; }
+
+  .progress-track { height: 8px; background: rgba(0, 0, 0, 0.05); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+  .progress-fill.accent { background: #b87333; }
+  .progress-fill.green { background: #22c55e; }
+  .progress-fill.red { background: #ef4444; }
+
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .stat-card { display: flex; flex-direction: column; }
+  .stat-label { font-size: 11px; font-weight: 700; color: #8c8984; letter-spacing: 0.05em; margin-bottom: 12px; }
+  .stat-main { display: flex; align-items: baseline; gap: 4px; margin-bottom: 12px; }
+  .stat-value { font-size: 32px; font-weight: 800; color: #3d3b38; letter-spacing: -0.02em; }
+  .stat-unit { font-size: 14px; font-weight: 600; color: #8c8984; }
+  .stat-subtext { font-size: 11px; color: #8c8984; margin-top: 8px; }
+
+  .mini-progress { height: 4px; background: rgba(0, 0, 0, 0.05); border-radius: 2px; overflow: hidden; }
+  .mini-fill { height: 100%; background: #3d3b38; border-radius: 2px; }
+
+  .card-title-small { font-size: 14px; font-weight: 700; color: #3d3b38; margin-bottom: 20px; }
+  .device-list { display: flex; flex-direction: column; gap: 12px; }
+  .device-item { display: flex; align-items: center; gap: 16px; padding: 12px; border-radius: 12px; background: #faf8f5; }
+  .status-indicator { width: 8px; height: 8px; border-radius: 50%; }
+  .status-indicator.available { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.4); }
+  .status-indicator.unavailable { background: #ef4444; }
+  .device-info { flex: 1; display: flex; flex-direction: column; }
+  .d-name { font-size: 14px; font-weight: 600; color: #3d3b38; }
+  .d-type { font-size: 11px; color: #8c8984; }
+  .in-use-pill { background: #fae8d1; color: #b87333; font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 8px; text-transform: uppercase; }
+
+  .loading-container { text-align: center; padding: 80px 0; color: #8c8984; }
+  .spinner { width: 32px; height: 32px; border: 3px solid rgba(184, 115, 51, 0.1); border-top-color: #b87333; border-radius: 50%; margin: 0 auto 20px; animation: spin 1s linear infinite; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 </style>

@@ -321,6 +321,51 @@ struct ChatMetrics {
     tokens_per_second: f32,
     time_to_first_token_ms: f32,
     num_output_tokens: usize,
+    total_context_tokens: usize,
+}
+
+#[tauri::command]
+async fn get_chat_sessions(state: State<'_, AppData>) -> Result<Vec<capi_core::db::ChatSession>, String> {
+    state.db.with_connection(|conn| {
+        capi_core::db::chats::list_sessions(conn)
+    }).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_chat_messages(state: State<'_, AppData>, session_id: String) -> Result<Vec<capi_core::db::ChatMessage>, String> {
+    state.db.with_connection(|conn| {
+        capi_core::db::chats::get_messages(conn, &session_id)
+    }).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_chat_session(state: State<'_, AppData>, session_id: String) -> Result<(), String> {
+    state.db.with_connection(|conn| {
+        capi_core::db::chats::delete_session(conn, &session_id)
+    }).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn create_chat_session(state: State<'_, AppData>, model_id: String, title: Option<String>) -> Result<String, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+        
+    let session = capi_core::db::ChatSession {
+        id: id.clone(),
+        title: Some(title.unwrap_or_else(|| "New Chat".to_string())),
+        model_id: Some(model_id),
+        created_at: now,
+        updated_at: now,
+    };
+    
+    state.db.with_connection(|conn| {
+        capi_core::db::chats::create_session(conn, &session)
+    }).map_err(|e| e.to_string())?;
+    
+    Ok(id)
 }
 
 #[tauri::command]
@@ -328,6 +373,7 @@ async fn chat_direct(
     app: tauri::AppHandle,
     model_id: String,
     prompt: String,
+    session_id: Option<String>,
     state: State<'_, AppData>,
 ) -> Result<ChatMetrics, String> {
     let mut sessions = state.sessions.lock()
@@ -336,15 +382,80 @@ async fn chat_direct(
     let session = sessions.get_mut(&model_id)
         .ok_or_else(|| format!("Model {} not loaded. Load it first.", model_id))?;
 
-    let (_response, metrics) = session.generate_stream(&prompt, 4096, move |token| {
+    let start_time = std::time::Instant::now();
+    let mut first_token_time = None;
+    let mut tokens_count = 0;
+    
+    // Initial context estimate
+    let prompt_tokens = session.get_context_tokens(); // last session context or initial
+
+    let (response, metrics) = session.generate_stream(&prompt, 4096, |token| {
+        tokens_count += 1;
+        let now = std::time::Instant::now();
+        
+        if first_token_time.is_none() {
+            first_token_time = Some(now);
+        }
+
         app.emit("chat-token", ChatToken { token: token.to_string() }).ok();
+        
+        // Rolling metrics update
+        if tokens_count % 2 == 0 {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            let tps = if elapsed > 0.0 { tokens_count as f32 / elapsed } else { 0.0 };
+            
+            app.emit("chat-metrics", ChatMetrics {
+                tokens_per_second: tps,
+                time_to_first_token_ms: first_token_time.map(|t| t.duration_since(start_time).as_millis() as f32).unwrap_or(0.0),
+                num_output_tokens: tokens_count,
+                total_context_tokens: prompt_tokens + tokens_count,
+            }).ok();
+        }
+        
         true
     }).map_err(|e| e.to_string())?;
+
+    // Persist messages if session_id is provided
+    if let Some(sid) = session_id {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let user_msg = capi_core::db::ChatMessage {
+            id: uuid::Uuid::new_v4().to_string(),
+            session_id: sid.clone(),
+            role: "user".to_string(),
+            content: prompt,
+            created_at: now,
+        };
+
+        let assistant_msg = capi_core::db::ChatMessage {
+            id: uuid::Uuid::new_v4().to_string(),
+            session_id: sid.clone(),
+            role: "assistant".to_string(),
+            content: response,
+            created_at: now + 1,
+        };
+
+        state.db.with_connection(|conn| {
+            capi_core::db::chats::add_message(conn, &user_msg)?;
+            capi_core::db::chats::add_message(conn, &assistant_msg)?;
+            
+            // Update session timestamp
+            if let Some(mut session) = capi_core::db::chats::get_session(conn, &sid)? {
+                session.updated_at = now + 1;
+                capi_core::db::chats::update_session(conn, &session)?;
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?;
+    }
 
     Ok(ChatMetrics {
         tokens_per_second: metrics.tokens_per_second,
         time_to_first_token_ms: metrics.time_to_first_token_ms,
         num_output_tokens: metrics.num_output_tokens,
+        total_context_tokens: session.get_context_tokens(),
     })
 }
 
@@ -500,6 +611,10 @@ pub fn run() {
             preload_model,
             load_model_direct,
             chat_direct,
+            get_chat_sessions,
+            get_chat_messages,
+            create_chat_session,
+            delete_chat_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

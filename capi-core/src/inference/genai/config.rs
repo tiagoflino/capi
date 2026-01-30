@@ -1,65 +1,69 @@
-use super::{ffi, check_status, Result};
-use std::ptr;
-use std::ffi::CString;
+//! Generation configuration for OpenVINO GenAI.
 
+use super::Result;
+use crate::genai_bridge::ffi;
+use cxx::UniquePtr;
+
+/// Configuration for text generation parameters.
 pub struct GenerationConfig {
-    raw: *mut ffi::ov_genai_generation_config,
+    inner: UniquePtr<ffi::GenerationConfigWrapper>,
 }
 
 unsafe impl Send for GenerationConfig {}
 unsafe impl Sync for GenerationConfig {}
 
 impl GenerationConfig {
+    /// Create a new GenerationConfig with default settings.
     pub fn new() -> Result<Self> {
-        unsafe {
-            let mut raw = ptr::null_mut();
-            let status = ffi::ov_genai_generation_config_create(&mut raw);
-            check_status(status)?;
-
-            Ok(Self { raw })
-        }
+        let inner = ffi::create_generation_config();
+        Ok(Self { inner })
     }
 
+    /// Set the maximum number of new tokens to generate.
     pub fn set_max_new_tokens(&mut self, max_tokens: usize) -> Result<()> {
-        unsafe {
-            let status = ffi::ov_genai_generation_config_set_max_new_tokens(self.raw, max_tokens);
-            check_status(status)
-        }
+        ffi::config_set_max_new_tokens(self.inner.pin_mut(), max_tokens);
+        Ok(())
     }
 
+    /// Set the temperature for sampling (higher = more random).
+    pub fn set_temperature(&mut self, temperature: f32) -> Result<()> {
+        ffi::config_set_temperature(self.inner.pin_mut(), temperature);
+        Ok(())
+    }
+
+    /// Set top-p (nucleus) sampling threshold.
+    pub fn set_top_p(&mut self, top_p: f32) -> Result<()> {
+        ffi::config_set_top_p(self.inner.pin_mut(), top_p);
+        Ok(())
+    }
+
+    /// Set top-k sampling (number of top tokens to consider).
+    pub fn set_top_k(&mut self, top_k: usize) -> Result<()> {
+        ffi::config_set_top_k(self.inner.pin_mut(), top_k);
+        Ok(())
+    }
+
+    /// Enable or disable sampling (vs greedy decoding).
+    pub fn set_do_sample(&mut self, do_sample: bool) -> Result<()> {
+        ffi::config_set_do_sample(self.inner.pin_mut(), do_sample);
+        Ok(())
+    }
+
+    /// Set strings that will stop generation when encountered.
     pub fn set_stop_strings(&mut self, stop_strings: &[&str]) -> Result<()> {
-        unsafe {
-            let c_strings: Vec<CString> = stop_strings
-                .iter()
-                .map(|s| CString::new(*s).unwrap())
-                .collect();
-
-            let mut c_ptrs: Vec<*const i8> = c_strings
-                .iter()
-                .map(|s| s.as_ptr())
-                .collect();
-
-            let status = ffi::ov_genai_generation_config_set_stop_strings(
-                self.raw,
-                c_ptrs.as_mut_ptr(),
-                c_ptrs.len(),
-            );
-
-            check_status(status)
-        }
+        let strings: Vec<String> = stop_strings.iter().map(|s| s.to_string()).collect();
+        ffi::config_set_stop_strings(self.inner.pin_mut(), strings);
+        Ok(())
     }
 
-    pub(crate) fn raw(&self) -> *mut ffi::ov_genai_generation_config {
-        self.raw
+    /// Get a reference to the inner wrapper for FFI calls.
+    pub(crate) fn inner(&self) -> &ffi::GenerationConfigWrapper {
+        &self.inner
     }
 }
 
-impl Drop for GenerationConfig {
-    fn drop(&mut self) {
-        unsafe {
-            if !self.raw.is_null() {
-                ffi::ov_genai_generation_config_free(self.raw);
-            }
-        }
+impl Default for GenerationConfig {
+    fn default() -> Self {
+        Self::new().expect("Failed to create default GenerationConfig")
     }
 }

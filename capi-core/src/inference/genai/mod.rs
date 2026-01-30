@@ -1,4 +1,8 @@
-mod ffi;
+//! OpenVINO GenAI inference module.
+//!
+//! This module provides Rust wrappers for the OpenVINO GenAI C++ library
+//! using cxx for safe FFI.
+
 mod pipeline;
 mod config;
 mod metrics;
@@ -7,9 +11,9 @@ pub use pipeline::{LLMPipeline, GenerationResult};
 pub use config::GenerationConfig;
 pub use metrics::PerfMetrics;
 
-use std::ffi::CStr;
 use thiserror::Error;
 
+/// Errors that can occur during GenAI operations.
 #[derive(Debug, Error)]
 pub enum GenAIError {
     #[error("OpenVINO GenAI error: {0}")]
@@ -25,22 +29,5 @@ pub enum GenAIError {
     InvalidUtf8,
 }
 
+/// Result type for GenAI operations.
 pub type Result<T> = std::result::Result<T, GenAIError>;
-
-fn check_status(status: ffi::ov_status_e) -> Result<()> {
-    if status == ffi::ov_status_e_OK {
-        Ok(())
-    } else {
-        let detail = unsafe {
-            let msg_ptr = ffi::ov_get_last_err_msg();
-            if !msg_ptr.is_null() {
-                CStr::from_ptr(msg_ptr).to_string_lossy().into_owned()
-            } else {
-                "No additional details".to_string()
-            }
-        };
-        let err_msg = format!("OpenVINO GenAI error status code: {} ({})", status as i32, detail);
-        println!("{}", err_msg);
-        Err(GenAIError::General(err_msg))
-    }
-}

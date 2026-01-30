@@ -17,6 +17,7 @@ pub struct InferenceSession {
     pipeline: LLMPipeline,
     in_chat_mode: bool,
     _lock: Option<ModelLock>,
+    context_tokens: usize,
 }
 
 impl InferenceSession {
@@ -69,6 +70,7 @@ impl InferenceSession {
             pipeline,
             in_chat_mode: false,
             _lock: None,
+            context_tokens: 0,
         })
     }
 
@@ -127,6 +129,7 @@ impl InferenceSession {
             pipeline,
             in_chat_mode: false,
             _lock: Some(lock),
+            context_tokens: 0,
         })
     }
 
@@ -144,59 +147,72 @@ impl InferenceSession {
         Ok(())
     }
 
-    pub fn generate(&self, prompt: &str, max_tokens: usize) -> Result<String> {
-        self.pipeline.generate(prompt, max_tokens)
-            .map_err(|e| anyhow::anyhow!("Generation failed: {}", e))
+    pub fn generate(&mut self, prompt: &str, max_tokens: usize) -> Result<String> {
+        let text = self.pipeline.generate(prompt, max_tokens)
+            .map_err(|e| anyhow::anyhow!("Generation failed: {}", e))?;
+        
+        self.context_tokens = self.pipeline.count_tokens(prompt) + self.pipeline.count_tokens(&text);
+        Ok(text)
     }
 
-    pub fn generate_with_metrics(&self, prompt: &str, max_tokens: usize) -> Result<(String, InferenceMetrics)> {
+    pub fn generate_with_metrics(&mut self, prompt: &str, max_tokens: usize) -> Result<(String, InferenceMetrics)> {
         let result = self.pipeline.generate_with_metrics(prompt, max_tokens)
             .map_err(|e| anyhow::anyhow!("Generation failed: {}", e))?;
 
-        let (throughput, _) = result.metrics.throughput()
-            .map_err(|e| anyhow::anyhow!("Failed to get throughput: {}", e))?;
-        let (ttft, _) = result.metrics.ttft()
-            .map_err(|e| anyhow::anyhow!("Failed to get TTFT: {}", e))?;
-        let (duration, _) = result.metrics.generate_duration()
-            .map_err(|e| anyhow::anyhow!("Failed to get duration: {}", e))?;
+        let (throughput, _) = result.metrics.throughput();
+        let (ttft, _) = result.metrics.ttft();
+        let (duration, _) = result.metrics.generate_duration();
+
+        let num_input = result.metrics.num_input_tokens();
+        let num_output = result.metrics.num_generated_tokens();
+
+        self.context_tokens = num_input + num_output;
 
         let metrics = InferenceMetrics {
             tokens_per_second: throughput,
             time_to_first_token_ms: ttft,
-            num_input_tokens: result.metrics.num_input_tokens()
-                .map_err(|e| anyhow::anyhow!("Failed to get input tokens: {}", e))?,
-            num_output_tokens: result.metrics.num_generated_tokens()
-                .map_err(|e| anyhow::anyhow!("Failed to get output tokens: {}", e))?,
+            num_input_tokens: num_input,
+            num_output_tokens: num_output,
             total_time_ms: duration,
         };
 
         Ok((result.text, metrics))
     }
 
-    pub fn generate_stream<F>(&self, prompt: &str, max_tokens: usize, callback: F) -> Result<(String, InferenceMetrics)>
-    where
-        F: FnMut(&str) -> bool,
+    pub fn generate_stream<F>(&mut self, prompt: &str, max_tokens: usize, mut callback: F) -> Result<(String, InferenceMetrics)> 
+    where F: FnMut(&str) -> bool
     {
-        let result = self.pipeline.generate_stream(prompt, max_tokens, callback)
-            .map_err(|e| anyhow::anyhow!("Generation failed: {}", e))?;
+        // Estimate prompt tokens if possible
+        let _prompt_tokens = self.pipeline.count_tokens(prompt);
+        
+        let result = self.pipeline.generate_stream(prompt, max_tokens, |token| {
+            callback(token)
+        })?;
 
-        let (throughput, _) = result.metrics.throughput()
-            .map_err(|e| anyhow::anyhow!("Failed to get throughput: {}", e))?;
-        let (ttft, _) = result.metrics.ttft()
-            .map_err(|e| anyhow::anyhow!("Failed to get TTFT: {}", e))?;
-        let (duration, _) = result.metrics.generate_duration()
-            .map_err(|e| anyhow::anyhow!("Failed to get duration: {}", e))?;
+        let (throughput, _) = result.metrics.throughput();
+        let (ttft, _) = result.metrics.ttft();
+        let (duration, _) = result.metrics.generate_duration();
+
+        let num_input = result.metrics.num_input_tokens();
+        let num_output = result.metrics.num_generated_tokens();
+
+        // Update session context size
+        // Note: OpenVINO GenAI in chat mode handles history, 
+        // but we want to know the total "active" context.
+        self.context_tokens = num_input + num_output;
 
         let metrics = InferenceMetrics {
             tokens_per_second: throughput,
             time_to_first_token_ms: ttft,
-            num_input_tokens: result.metrics.num_input_tokens()
-                .map_err(|e| anyhow::anyhow!("Failed to get input tokens: {}", e))?,
-            num_output_tokens: result.metrics.num_generated_tokens()
-                .map_err(|e| anyhow::anyhow!("Failed to get output tokens: {}", e))?,
+            num_input_tokens: num_input,
+            num_output_tokens: num_output,
             total_time_ms: duration,
         };
 
         Ok((result.text, metrics))
+    }
+
+    pub fn get_context_tokens(&self) -> usize {
+        self.context_tokens
     }
 }

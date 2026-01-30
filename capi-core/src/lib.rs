@@ -4,6 +4,7 @@ pub mod model_manager;
 pub mod hardware;
 pub mod config;
 pub mod db;
+pub mod genai_bridge;
 
 pub use api::{create_router, AppState};
 pub use config::Config;
