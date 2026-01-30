@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { onMount } from 'svelte';
   import Modal from '$lib/Modal.svelte';
 

@@ -157,22 +157,22 @@ impl LLMPipeline {
             extern "C" fn stream_callback<F>(
                 token: *const c_char,
                 user_data: *mut std::os::raw::c_void,
-            ) -> ffi::ov_genai_streamming_status_e
+            ) -> ffi::ov_genai_streaming_status_e
             where
                 F: FnMut(&str) -> bool,
             {
                 unsafe {
                     if token.is_null() {
-                        return ffi::ov_genai_streamming_status_e_OV_GENAI_STREAMMING_STATUS_RUNNING;
+                        return ffi::ov_genai_streaming_status_e_OV_GENAI_STREAMING_STATUS_RUNNING;
                     }
 
                     let callback = &mut *(user_data as *mut F);
                     let token_str = CStr::from_ptr(token).to_str().unwrap_or("");
 
                     if callback(token_str) {
-                        ffi::ov_genai_streamming_status_e_OV_GENAI_STREAMMING_STATUS_RUNNING
+                        ffi::ov_genai_streaming_status_e_OV_GENAI_STREAMING_STATUS_RUNNING
                     } else {
-                        ffi::ov_genai_streamming_status_e_OV_GENAI_STREAMMING_STATUS_CANCEL
+                        ffi::ov_genai_streaming_status_e_OV_GENAI_STREAMING_STATUS_CANCEL
                     }
                 }
             }

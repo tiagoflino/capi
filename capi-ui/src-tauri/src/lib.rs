@@ -5,6 +5,7 @@ use tauri::{Emitter, State};
 use serde::Serialize;
 
 struct AppData {
+    #[allow(dead_code)]
     db: Arc<capi_core::Database>,
     registry: Arc<capi_core::Registry>,
     downloader: capi_core::Downloader,
@@ -197,7 +198,7 @@ async fn download_specific_file(
     state.downloader
         .download_file_with_progress(&url, &model_path.join(&filename), move |current, total| {
             if total > 0 {
-                let percent = (current as f64 / total as f64 * 100.0);
+                let percent = current as f64 / total as f64 * 100.0;
                 app.emit("download-progress", DownloadProgress {
                     current,
                     total,
@@ -260,6 +261,9 @@ struct GpuResourceResponse {
     name: String,
     total_vram_bytes: u64,
     available_vram_bytes: u64,
+    usage_percent: f32,
+    frequency_mhz: u32,
+    max_frequency_mhz: u32,
 }
 
 #[tauri::command]
@@ -284,11 +288,20 @@ async fn load_model_direct(
         .unwrap_or_else(|| "CPU".to_string());
 
     let model_path = std::path::Path::new(&model.path);
+    println!("Loading model {} from {:?} on device {}", model_id, model_path, device);
 
     let mut session = capi_core::InferenceSession::load_with_lock(model_path, &device, &model_id)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            println!("Error loading model into session: {}", e);
+            e.to_string()
+        })?;
 
-    session.start_chat().map_err(|e| e.to_string())?;
+    println!("Starting chat for session...");
+    session.start_chat().map_err(|e| {
+        println!("Error starting chat: {}", e);
+        e.to_string()
+    })?;
+    println!("Model {} successfully loaded", model_id);
 
     let mut sessions = state.sessions.lock()
         .map_err(|_| "Failed to acquire sessions lock".to_string())?;
@@ -323,7 +336,7 @@ async fn chat_direct(
     let session = sessions.get_mut(&model_id)
         .ok_or_else(|| format!("Model {} not loaded. Load it first.", model_id))?;
 
-    let (response, metrics) = session.generate_stream(&prompt, 4096, move |token| {
+    let (_response, metrics) = session.generate_stream(&prompt, 4096, move |token| {
         app.emit("chat-token", ChatToken { token: token.to_string() }).ok();
         true
     }).map_err(|e| e.to_string())?;
@@ -383,6 +396,9 @@ async fn get_system_resources() -> Result<SystemResourcesResponse, String> {
             name: gpu.name.clone(),
             total_vram_bytes: gpu.total_vram_bytes,
             available_vram_bytes: gpu.available_vram_bytes,
+            usage_percent: gpu.usage_percent,
+            frequency_mhz: gpu.frequency_mhz,
+            max_frequency_mhz: gpu.max_frequency_mhz,
         }).collect(),
     })
 }

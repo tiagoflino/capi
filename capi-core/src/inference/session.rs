@@ -43,9 +43,7 @@ impl InferenceSession {
                         eprintln!("This may cause OOM errors or system instability.");
 
                         if matches!(config.resource_mode, crate::hardware::ResourceMode::Loose) {
-                            eprintln!("Press Enter to continue or Ctrl+C to cancel...");
-                            let mut input = String::new();
-                            std::io::stdin().read_line(&mut input)?;
+                            eprintln!("Warning: Resource mode is Loose. Continuing despite potential memory pressure.");
                         }
                     },
                     ValidationResult::Insufficient { message } => {
@@ -98,9 +96,7 @@ impl InferenceSession {
                         eprintln!("This may cause OOM errors or system instability.");
 
                         if matches!(config.resource_mode, crate::hardware::ResourceMode::Loose) {
-                            eprintln!("Press Enter to continue or Ctrl+C to cancel...");
-                            let mut input = String::new();
-                            std::io::stdin().read_line(&mut input)?;
+                            eprintln!("Warning: Resource mode is Loose. Continuing despite potential memory pressure.");
                         }
                     },
                     ValidationResult::Insufficient { message } => {
@@ -117,10 +113,15 @@ impl InferenceSession {
             }
         }
 
+        println!("Calling LLMPipeline::new with path: {} and device: {}", path_to_use.to_str().unwrap(), device);
         let pipeline = LLMPipeline::new(
             path_to_use.to_str().unwrap(),
             device,
-        ).map_err(|e| anyhow::anyhow!("Failed to create pipeline: {}", e))?;
+        ).map_err(|e| {
+            println!("LLMPipeline::new failed: {}", e);
+            anyhow::anyhow!("Failed to create pipeline: {}", e)
+        })?;
+        println!("LLMPipeline created successfully");
 
         Ok(Self {
             pipeline,

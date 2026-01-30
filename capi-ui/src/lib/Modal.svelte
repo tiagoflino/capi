@@ -3,13 +3,19 @@
 </script>
 
 {#if isOpen}
-  <div
-    style="position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 50;"
+<div
+    class="modal-backdrop"
     onclick={onClose}
+    role="button"
+    tabindex="0"
+    onkeydown={(e) => e.key === 'Escape' && onClose()}
   >
     <div
-      style="background: #181818; border: 1px solid #282828; border-radius: 16px; max-width: 800px; width: 90%; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;"
+      class="modal-content"
       onclick={(e) => e.stopPropagation()}
+      role="button"
+      tabindex="0"
+      onkeydown={(e) => e.stopPropagation()}
     >
       <!-- Header -->
       <div style="padding: 20px 24px; border-bottom: 1px solid #282828; display: flex; align-items: center; justify-content: between;">
@@ -31,6 +37,28 @@
 {/if}
 
 <style>
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+
+  .modal-content {
+    background: #181818;
+    border: 1px solid #282828;
+    border-radius: 16px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
   button:hover {
     background: #282828 !important;
     color: white !important;

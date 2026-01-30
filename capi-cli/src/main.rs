@@ -467,7 +467,7 @@ async fn main() -> Result<()> {
 
                 let mut is_first_token = true;
 
-                let (output, metrics) = session.generate_stream(input, 4096, move |token| {
+                    let (_output, metrics) = session.generate_stream(input, 4096, move |token| {
                     // Check stop flag first
                     if stop_clone.load(Ordering::Relaxed) {
                         print!("\r\n\r\n[Generation stopped]\r\n");
@@ -525,7 +525,7 @@ async fn main() -> Result<()> {
             let device = capi_core::select_best_device(&devices, &config.device_preference)
                 .unwrap_or_else(|| "CPU".to_string());
 
-            let mut session = capi_core::InferenceSession::load(model_path, &device)?;
+            let session = capi_core::InferenceSession::load(model_path, &device)?;
             let output = session.generate(&prompt, 50)?;
 
             println!("{}", output);
@@ -878,44 +878,7 @@ fn find_file_with_extension(dir: &std::path::Path, ext: &str) -> Result<Option<s
         .map(|e| e.path()))
 }
 
-fn get_cpu_usage() -> f32 {
-    #[cfg(target_os = "linux")]
-    {
-        use std::fs;
-        use std::thread;
-        use std::time::Duration;
 
-        if let Ok(stat1) = fs::read_to_string("/proc/stat") {
-            if let Some(line1) = stat1.lines().next() {
-                let parts1: Vec<&str> = line1.split_whitespace().collect();
-                if parts1.len() > 4 && parts1[0] == "cpu" {
-                    thread::sleep(Duration::from_millis(100));
-
-                    if let Ok(stat2) = fs::read_to_string("/proc/stat") {
-                        if let Some(line2) = stat2.lines().next() {
-                            let parts2: Vec<&str> = line2.split_whitespace().collect();
-                            if parts2.len() > 4 && parts2[0] == "cpu" {
-                                let idle1: f32 = parts1[4].parse().unwrap_or(0.0);
-                                let idle2: f32 = parts2[4].parse().unwrap_or(0.0);
-
-                                let total1: f32 = parts1[1..].iter().filter_map(|s| s.parse::<f32>().ok()).sum();
-                                let total2: f32 = parts2[1..].iter().filter_map(|s| s.parse::<f32>().ok()).sum();
-
-                                let total_diff = total2 - total1;
-                                let idle_diff = idle2 - idle1;
-
-                                if total_diff > 0.0 {
-                                    return ((total_diff - idle_diff) / total_diff * 100.0).min(100.0).max(0.0);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    0.0
-}
 
 fn format_timestamp(ts: i64) -> String {
     let now = std::time::SystemTime::now()

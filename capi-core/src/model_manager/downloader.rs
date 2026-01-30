@@ -56,15 +56,10 @@ struct HfApiModel {
     #[serde(rename = "cardData")]
     card_data: Option<serde_json::Value>,
     tags: Option<Vec<String>>,
-    #[serde(rename = "safetensors")]
-    safetensors: Option<serde_json::Value>,
-    gguf: Option<serde_json::Value>,
+    // safetensors and gguf removed as unused
 }
 
-#[derive(Debug, Deserialize)]
-struct HfSearchResponse {
-    models: Option<Vec<HfApiModel>>,
-}
+// HfSearchResponse removed as unused
 
 pub struct Downloader {
     client: Client,
@@ -364,19 +359,7 @@ impl Downloader {
         Ok(())
     }
 
-    async fn download_file(&self, url: &str, destination: &Path) -> Result<()> {
-        let response = self.client.get(url).send().await?;
-
-        if !response.status().is_success() {
-            return Err(anyhow::anyhow!("HTTP error: {}", response.status()));
-        }
-
-        let bytes = response.bytes().await?;
-        let mut file = File::create(destination).await?;
-        file.write_all(&bytes).await?;
-
-        Ok(())
-    }
+    // download_file removed as unused
 
     pub async fn download_file_with_progress<F>(
         &self,

@@ -2,12 +2,14 @@ use axum::{Json, response::IntoResponse};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct EmbeddingRequest {
     pub model: Option<String>,
     pub input: EmbeddingInput,
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 #[serde(untagged)]
 pub enum EmbeddingInput {
     Single(String),

@@ -43,16 +43,10 @@
     }
   });
 
-  async function onModelChange(e: Event) {
-    const target = e.target as HTMLSelectElement;
-    const newModel = target.value;
-    if (newModel && newModel !== selectedModel) {
-      selectedModel = newModel;
-      await preloadModel(newModel);
-    }
-  }
+
 
   async function preloadModel(modelId: string) {
+    if (!modelId) return;
     modelLoading = true;
     loadingStatus = 'Loading model into memory...';
     try {
@@ -125,6 +119,7 @@
       <div style="display: flex; align-items: center; gap: 16px;">
         <select
           bind:value={selectedModel}
+          onchange={(e) => preloadModel(e.currentTarget.value)}
           disabled={generating || modelLoading}
           style="padding: 8px 16px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px; cursor: pointer;"
         >

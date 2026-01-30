@@ -58,20 +58,20 @@
             <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">Server</h2>
             <div style="display: flex; flex-direction: column; gap: 16px;">
               <div>
-                <label style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Host</label>
-                <input type="text" bind:value={config.server_host} style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;" />
+                <label for="server-host" style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Host</label>
+                <input id="server-host" type="text" bind:value={config.server_host} style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;" />
               </div>
               <div>
-                <label style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Port</label>
-                <input type="number" bind:value={config.server_port} style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;" />
+                <label for="server-port" style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Port</label>
+                <input id="server-port" type="number" bind:value={config.server_port} style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;" />
               </div>
             </div>
           </div>
 
           <!-- Device -->
           <div>
-            <label style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Device Preference</label>
-            <select bind:value={config.device_preference} style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;">
+            <label for="device-pref" style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Device Preference</label>
+            <select id="device-pref" bind:value={config.device_preference} style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;">
               <option value="auto">Auto</option>
               <option value="cpu">CPU</option>
               <option value="gpu">GPU</option>
@@ -81,8 +81,8 @@
 
           <!-- Resource Mode -->
           <div>
-            <label style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Resource Mode</label>
-            <select bind:value={config.resource_mode} style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;">
+            <label for="resource-mode" style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Resource Mode</label>
+            <select id="resource-mode" bind:value={config.resource_mode} style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;">
               <option value="strict">Strict (block if insufficient memory)</option>
               <option value="loose">Loose (warn but allow)</option>
             </select>
@@ -90,8 +90,8 @@
 
           <!-- Context Length -->
           <div>
-            <label style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Default Context Length</label>
-            <input type="number" bind:value={config.default_context_length} step="1024" style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;" />
+            <label for="context-length" style="display: block; font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 6px;">Default Context Length</label>
+            <input id="context-length" type="number" bind:value={config.default_context_length} step="1024" style="width: 100%; padding: 10px 14px; background: #282828; border: 1px solid #404040; border-radius: 8px; color: white; font-size: 14px;" />
             <p style="font-size: 12px; color: #666; margin-top: 6px;">{(config.default_context_length / 1024).toFixed(0)}K tokens</p>
           </div>
 
