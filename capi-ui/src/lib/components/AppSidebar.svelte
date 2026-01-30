@@ -99,7 +99,7 @@
   const isActive = (path: string) => $page.url.pathname === path;
 </script>
 
-<aside class="sidebar glass" class:collapsed={!$isSidebarOpen}>
+<aside class="sidebar" class:collapsed={!$isSidebarOpen}>
   <!-- 1. Header & Nav -->
   <div class="sidebar-header">
     <div class="brand">
@@ -150,10 +150,21 @@
       </button>
 
       {#each sessions as session}
-        <div class="session-row {$currentSessionId === session.id ? 'active' : ''}" onclick={() => $currentSessionId = session.id}>
+        <div 
+          class="session-row {$currentSessionId === session.id ? 'active' : ''}" 
+          onclick={() => $currentSessionId = session.id}
+          onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && ($currentSessionId = session.id)}
+          role="button"
+          tabindex="0"
+          aria-label="Select chat session: {session.title || 'Untitled'}"
+        >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chat-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           <span class="title">{session.title || 'Untitled'}</span>
-          <button class="delete-btn" onclick={(e) => { e.stopPropagation(); deleteSession(session.id); }}>×</button>
+          <button 
+            class="delete-btn" 
+            onclick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
+            aria-label="Delete session"
+          >×</button>
         </div>
       {/each}
     </div>
@@ -194,8 +205,8 @@
           <label>System</label>
           <ResourceGauge label="CPU" used={resources.cpu_usage_percent} total={100} unit="%" />
           <ResourceGauge label="RAM" used={(resources.total_ram_bytes - resources.available_ram_bytes)/1e9} total={resources.total_ram_bytes/1e9} />
-          {#if resources.gpu_resources.length > 0}
-            <ResourceGauge label="GPU" used={resources.gpu_resources[0].usage_percent} total={100} unit="%" />
+           {#if resources.gpu_resources.length > 0}
+            <ResourceGauge label={resources.gpu_resources[0].name || "GPU"} used={resources.gpu_resources[0].usage_percent} total={100} unit="%" />
              <!-- VRAM -->
              <ResourceGauge label="VRAM" used={(resources.gpu_resources[0].total_vram_bytes - resources.gpu_resources[0].available_vram_bytes)/1e9} total={resources.gpu_resources[0].total_vram_bytes/1e9} />
           {/if}
@@ -216,6 +227,7 @@
 <style>
   .sidebar {
     width: 260px;
+    flex-shrink: 0;
     background: #ffffff;
     border-right: 1px solid rgba(0,0,0,0.06);
     display: flex;

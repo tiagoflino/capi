@@ -1,9 +1,9 @@
 <script lang="ts">
   let { label, used, total, unit = 'GB' }: { label: string; used: number; total: number; unit?: string } = $props();
 
-  const percentage = (used / total) * 100;
+  let percentage = $derived(total > 0 ? (used / total) * 100 : 0);
   // Using more sophisticated 'Capybara' colors for the progress bars
-  const color = percentage > 85 ? '#ff453a' : percentage > 70 ? '#ff9f0a' : '#b87333';
+  let color = $derived(percentage > 85 ? '#ff453a' : percentage > 70 ? '#ff9f0a' : '#b87333');
 </script>
 
 <div class="gauge-container">

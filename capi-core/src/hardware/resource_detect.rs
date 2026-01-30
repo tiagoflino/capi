@@ -27,7 +27,7 @@ pub fn detect_system_resources() -> Result<SystemResources> {
     let total_ram_bytes = sys.total_memory();
     let available_ram_bytes = sys.available_memory();
 
-    let gpu_resources = detect_gpu_resources();
+    let gpu_resources = detect_gpu_resources(&sys);
 
     Ok(SystemResources {
         total_ram_bytes,
@@ -36,10 +36,10 @@ pub fn detect_system_resources() -> Result<SystemResources> {
     })
 }
 
-fn detect_gpu_resources() -> Vec<GpuResource> {
+fn detect_gpu_resources(sys: &System) -> Vec<GpuResource> {
     let mut resources = Vec::new();
 
-    if let Some(intel) = detect_intel_gpu() {
+    if let Some(intel) = detect_intel_gpu(sys) {
         resources.push(intel);
     }
 
@@ -47,9 +47,9 @@ fn detect_gpu_resources() -> Vec<GpuResource> {
 }
 
 #[cfg(target_os = "linux")]
-fn detect_intel_gpu() -> Option<GpuResource> {
+fn detect_intel_gpu(sys: &System) -> Option<GpuResource> {
     // First try xe driver sysfs paths (newer Intel GPUs)
-    if let Some(gpu) = detect_intel_gpu_xe() {
+    if let Some(gpu) = detect_intel_gpu_xe(sys) {
         return Some(gpu);
     }
 
@@ -84,8 +84,7 @@ fn detect_intel_gpu() -> Option<GpuResource> {
 
 /// Detect Intel GPU using xe driver sysfs paths (Meteor Lake, Lunar Lake, etc.)
 #[cfg(target_os = "linux")]
-fn detect_intel_gpu_xe() -> Option<GpuResource> {
-
+fn detect_intel_gpu_xe(sys: &System) -> Option<GpuResource> {
     for card in 0..10 {
         let vendor_path = format!("/sys/class/drm/card{}/device/vendor", card);
         
@@ -98,15 +97,8 @@ fn detect_intel_gpu_xe() -> Option<GpuResource> {
             continue;
         }
 
-        // Check for xe driver tile/gt structure
+        // Try to read frequency metrics if they exist, but don't fail if they don't
         let freq_path = format!("/sys/class/drm/card{}/device/tile0/gt0/freq0", card);
-        let gtidle_path = format!("/sys/class/drm/card{}/device/tile0/gt0/gtidle", card);
-
-        if !std::path::Path::new(&freq_path).exists() {
-            continue;
-        }
-
-        // Read frequency metrics
         let act_freq = std::fs::read_to_string(format!("{}/act_freq", freq_path))
             .ok()
             .and_then(|s| s.trim().parse::<u32>().ok())
@@ -117,8 +109,13 @@ fn detect_intel_gpu_xe() -> Option<GpuResource> {
             .and_then(|s| s.trim().parse::<u32>().ok())
             .unwrap_or(0);
 
-        // Calculate GPU usage from idle residency
-        let usage_percent = calculate_gpu_usage_from_idle(&gtidle_path);
+        // Calculate GPU usage from idle residency if possible
+        let gtidle_path = format!("/sys/class/drm/card{}/device/tile0/gt0/gtidle", card);
+        let usage_percent = if std::path::Path::new(&gtidle_path).exists() {
+            calculate_gpu_usage_from_idle(&gtidle_path)
+        } else {
+            0.0
+        };
 
         // Get GPU name from device ID
         let device_path = format!("/sys/class/drm/card{}/device/device", card);
@@ -129,28 +126,39 @@ fn detect_intel_gpu_xe() -> Option<GpuResource> {
         
         let gpu_name = get_intel_gpu_name(&device_id);
 
-        // For integrated GPUs, use system RAM as shared memory
-        let mut sys = System::new(); // Don't need new_all, just memory
-        sys.refresh_memory();
-        
-        let mut available_vram = sys.available_memory();
-        let total_vram = sys.total_memory();
-        
-        // Fallback: if sysinfo available_memory is 0 but total is not, 
-        // it might be a parsing issue. Try free_memory.
-        if available_vram == 0 && total_vram > 0 {
-            available_vram = sys.free_memory();
-        }
-        
-        // If still 0, use a conservative 25% of total as "available" 
-        // to avoid blocking user completely if detection fails
-        if available_vram == 0 && total_vram > 0 {
-            available_vram = total_vram / 4;
+        // Try to read explicit VRAM info (Discrete GPU)
+        let total_vram_path = format!("/sys/class/drm/card{}/device/mem_info_vram_total", card);
+        let used_vram_path = format!("/sys/class/drm/card{}/device/mem_info_vram_used", card);
+
+        let mut gpu_total = 0;
+        let mut gpu_available = 0;
+        let mut found_vram = false;
+
+        if let (Ok(t_str), Ok(u_str)) = (std::fs::read_to_string(&total_vram_path), std::fs::read_to_string(&used_vram_path)) {
+            if let (Ok(t), Ok(u)) = (t_str.trim().parse::<u64>(), u_str.trim().parse::<u64>()) {
+                gpu_total = t;
+                gpu_available = t.saturating_sub(u);
+                found_vram = true;
+            }
         }
 
-        // Shared memory is typically up to 50% of system RAM
-        let gpu_total = total_vram / 2;
-        let gpu_available = available_vram.min(gpu_total);
+        if !found_vram {
+            // Fallback: For integrated GPUs, use system RAM as shared memory
+            let mut available_ram = sys.available_memory();
+            let total_ram = sys.total_memory();
+            
+            if available_ram == 0 && total_ram > 0 {
+                available_ram = sys.free_memory();
+            }
+            
+            if available_ram == 0 && total_ram > 0 {
+                available_ram = total_ram / 4;
+            }
+
+            // Shared memory is typically up to 50% of system RAM
+            gpu_total = total_ram / 2;
+            gpu_available = available_ram.min(gpu_total);
+        }
 
         return Some(GpuResource {
             name: gpu_name,
