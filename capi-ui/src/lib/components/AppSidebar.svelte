@@ -204,11 +204,11 @@
         <div class="control-group metrics-group">
           <label>System</label>
           <ResourceGauge label="CPU" used={resources.cpu_usage_percent} total={100} unit="%" />
-          <ResourceGauge label="RAM" used={(resources.total_ram_bytes - resources.available_ram_bytes)/1e9} total={resources.total_ram_bytes/1e9} />
+          <ResourceGauge label="RAM" used={(resources.total_ram_bytes - resources.available_ram_bytes)/(1024*1024*1024)} total={resources.total_ram_bytes/(1024*1024*1024)} />
            {#if resources.gpu_resources.length > 0}
             <ResourceGauge label={resources.gpu_resources[0].name || "GPU"} used={resources.gpu_resources[0].usage_percent} total={100} unit="%" />
              <!-- VRAM -->
-             <ResourceGauge label="VRAM" used={(resources.gpu_resources[0].total_vram_bytes - resources.gpu_resources[0].available_vram_bytes)/1e9} total={resources.gpu_resources[0].total_vram_bytes/1e9} />
+             <ResourceGauge label="VRAM" used={(resources.gpu_resources[0].total_vram_bytes - resources.gpu_resources[0].available_vram_bytes)/(1024*1024*1024)} total={resources.gpu_resources[0].total_vram_bytes/(1024*1024*1024)} />
           {/if}
         </div>
       {/if}
