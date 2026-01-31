@@ -150,13 +150,8 @@
       {#if messages.length === 0}
         <div class="empty-state">
            <div class="logo-hero">
-             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-               <circle cx="12" cy="12" r="10" stroke="#b87333" stroke-dasharray="4 4"/>
-               <path d="M12 11V13M12 17H12.01" stroke="#b87333" stroke-linecap="round" stroke-width="2"/>
-               <circle cx="12" cy="12" r="4" fill="#fae8d1"/>
-             </svg>
+             <img src="/favicon.png" alt="Capi Logo" style="width: 100%; height: 100%; object-fit: contain;" />
            </div>
-           <h1>Capybara</h1>
            <p>Intelligent Local Inference</p>
            <div class="quick-tips">
              <div class="tip">Support for Markdown & Tables</div>
@@ -169,7 +164,7 @@
           <div class="message-row {msg.role}">
             <div class="bubble">
               <div class="role-header">
-                 <span class="role-name">{msg.role === 'user' ? 'You' : 'Capybara'}</span>
+                 <span class="role-name">{msg.role === 'user' ? 'You' : 'Capi'}</span>
                  {#if msg.metrics}
                     <span class="m-stat">{msg.metrics.tokens_per_second.toFixed(1)} t/s</span>
                  {/if}

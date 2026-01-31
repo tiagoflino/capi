@@ -104,10 +104,7 @@
   <div class="sidebar-header">
     <div class="brand">
       <div class="logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-           <circle cx="12" cy="12" r="10" stroke="#b87333" stroke-dasharray="4 4"/>
-           <path d="M12 8v8M8 12h8" stroke="#b87333" stroke-linecap="round"/>
-        </svg>
+        <img src="/favicon.png" alt="Capi Logo" style="width: 100%; height: 100%; object-fit: contain;" />
       </div>
       <span class="brand-text">Capi</span>
     </div>
