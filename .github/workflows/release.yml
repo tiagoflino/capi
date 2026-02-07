@@ -1,0 +1,94 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            platform: windows
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Node.js setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: capi-ui/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd capi-ui
+          npm ci
+
+      - name: Build (Windows)
+        if: matrix.platform == 'windows'
+        shell: powershell
+        run: |
+          .\scripts\build_windows.ps1
+
+      - name: Build (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          chmod +x scripts/build_linux.sh
+          ./scripts/build_linux.sh
+
+      - name: Prepare Artifcats
+        shell: bash
+        run: |
+          mkdir release_artifacts
+          
+          if [ "${{ matrix.platform }}" == "windows" ]; then
+            mv capi-windows-x64.zip release_artifacts/
+            find target/release/bundle/nsis -name "*.exe" -exec cp {} release_artifacts/ \;
+            cp install.ps1 release_artifacts/
+          elif [ "${{ matrix.platform }}" == "linux" ]; then
+            mv capi-linux-x64.tar.gz release_artifacts/
+            # Copy Deb/Rpm
+            find target/release/bundle/deb -name "*.deb" -exec cp {} release_artifacts/ \;
+            find target/release/bundle/rpm -name "*.rpm" -exec cp {} release_artifacts/ \;
+            cp install.sh release_artifacts/
+          fi
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: release_artifacts/*
+          generate_release_notes: true
