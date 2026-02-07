@@ -2,7 +2,7 @@
 /dist
 **/*.rs.bk
 *.pdb
-Cargo.lock
+
 .DS_Store
 .vscode
 .idea
