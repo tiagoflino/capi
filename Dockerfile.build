@@ -1,0 +1,51 @@
+# Use Ubuntu 22.04 as the base for maximum compatibility with WebKitGtk and OpenVINO
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    wget \
+    file \
+    libssl-dev \
+    libgtk-3-dev \
+    libwebkit2gtk-4.1-dev \
+    libappindicator3-dev \
+    librsvg2-dev \
+    libsoup-3.0-dev \
+    patchelf \
+    pkg-config \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install Node.js (v20 LTS)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pre-download OpenVINO to cache it in the image
+ENV OV_VERSION="2025.4.1.0"
+ENV OV_SHORT_VER="2025.4.1"
+ENV OV_URL="https://storage.openvinotoolkit.org/repositories/openvino_genai/packages/${OV_SHORT_VER}/linux/openvino_genai_ubuntu22_${OV_VERSION}_x86_64.tar.gz"
+
+RUN mkdir -p /opt/openvino && \
+    curl -L ${OV_URL} -o /tmp/openvino.tar.gz && \
+    tar -xzf /tmp/openvino.tar.gz -C /opt/openvino --strip-components=1 && \
+    rm /tmp/openvino.tar.gz
+
+# Set OpenVINO environment variables for the container
+ENV OPENVINO_DIR=/opt/openvino
+ENV OPENVINO_ROOT=/opt/openvino
+ENV LD_LIBRARY_PATH=/opt/openvino/runtime/lib/intel64:/opt/openvino/runtime/3rdparty/tbb/lib:${LD_LIBRARY_PATH}
+
+WORKDIR /app
+
+# The actual source code will be mounted at /app during runtime
+CMD ["make", "bundle", "OPENVINO_DIR=/opt/openvino"]

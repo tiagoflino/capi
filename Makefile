@@ -1,4 +1,5 @@
 OPENVINO_VER := 2025.4.1.0
+DOCKER_IMAGE := capi-builder:latest
 OPENVINO_URL := https://storage.openvinotoolkit.org/repositories/openvino_genai/packages/2025.4.1/linux/openvino_genai_ubuntu22_$(OPENVINO_VER)_x86_64.tar.gz
 LIBS_DIR := $(shell pwd)/libs
 OPENVINO_DIR := $(LIBS_DIR)/openvino
@@ -68,4 +69,15 @@ bundle: download-deps
 	@chmod +x target/release/capi-linux-x64/bin/capi-wrapper
 	@cd target/release && tar -czf capi-linux-x64.tar.gz capi-linux-x64
 	@echo "Portable tarball created at target/release/capi-linux-x64.tar.gz"
+
+# --- Docker Integration ---
+docker-build:
+	docker build -t $(DOCKER_IMAGE) -f Dockerfile.build .
+
+docker-run-test:
+	docker run --rm -v $(shell pwd):/app $(DOCKER_IMAGE) cargo test --all-targets --all-features
+
+docker-run-bundle:
+	docker run --rm -v $(shell pwd):/app $(DOCKER_IMAGE) make bundle OPENVINO_DIR=/opt/openvino
+
 

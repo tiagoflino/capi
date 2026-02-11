@@ -67,8 +67,8 @@ jobs:
       - name: Build (Linux)
         if: matrix.platform == 'linux'
         run: |
-          chmod +x scripts/build_linux.sh
-          ./scripts/build_linux.sh
+          make docker-build
+          make docker-run-bundle
 
       - name: Prepare Artifcats
         shell: bash
@@ -80,7 +80,7 @@ jobs:
             find target/release/bundle/nsis -name "*.exe" -exec cp {} release_artifacts/ \;
             cp install.ps1 release_artifacts/
           elif [ "${{ matrix.platform }}" == "linux" ]; then
-            mv capi-linux-x64.tar.gz release_artifacts/
+            mv target/release/capi-linux-x64.tar.gz release_artifacts/
             # Copy Deb/Rpm
             find target/release/bundle/deb -name "*.deb" -exec cp {} release_artifacts/ \;
             find target/release/bundle/rpm -name "*.rpm" -exec cp {} release_artifacts/ \;
