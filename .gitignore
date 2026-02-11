@@ -21,3 +21,6 @@ node_modules/
 
 # Windows Zone.Identifier files
 *:Zone.Identifier
+
+# Downloaded dependencies
+libs/
