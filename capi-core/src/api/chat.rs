@@ -239,7 +239,7 @@ fn create_streaming_response(
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs() as i64;
 
         let id = format!("chatcmpl-{}", uuid::Uuid::new_v4());
@@ -279,8 +279,9 @@ fn create_streaming_response(
 
             is_first = false;
 
-            let json = serde_json::to_string(&chunk).unwrap();
-            yield Ok(Event::default().data(json));
+            if let Ok(json) = serde_json::to_string(&chunk) {
+                yield Ok(Event::default().data(json));
+            }
         }
 
         // drop(session_guard); - removed as not acquired
@@ -301,8 +302,9 @@ fn create_streaming_response(
             }],
         };
 
-        let json = serde_json::to_string(&final_chunk).unwrap();
-        yield Ok(Event::default().data(json));
+        if let Ok(json) = serde_json::to_string(&final_chunk) {
+            yield Ok(Event::default().data(json));
+        }
     }
 }
 

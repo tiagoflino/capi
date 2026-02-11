@@ -115,15 +115,12 @@ impl InferenceSession {
             }
         }
 
-        println!("Calling LLMPipeline::new with path: {} and device: {}", path_to_use.to_str().unwrap(), device);
         let pipeline = LLMPipeline::new(
             path_to_use.to_str().unwrap(),
             device,
         ).map_err(|e| {
-            println!("LLMPipeline::new failed: {}", e);
             anyhow::anyhow!("Failed to create pipeline: {}", e)
         })?;
-        println!("LLMPipeline created successfully");
 
         Ok(Self {
             pipeline,

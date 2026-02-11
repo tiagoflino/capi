@@ -15,6 +15,9 @@ pub struct LLMPipeline {
     inner: UniquePtr<ffi::LLMPipelineWrapper>,
 }
 
+// SAFETY: The underlying C++ LLMPipeline is thread-safe for inference operations.
+// OpenVINO GenAI pipelines are designed to be used concurrently, with internal
+// synchronization handling concurrent access to model resources.
 unsafe impl Send for LLMPipeline {}
 unsafe impl Sync for LLMPipeline {}
 

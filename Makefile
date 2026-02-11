@@ -78,6 +78,9 @@ docker-run-test:
 	docker run --rm -v $(shell pwd):/app $(DOCKER_IMAGE) cargo test --workspace --exclude capi-ui --all-targets --all-features
 
 docker-run-bundle:
-	docker run --rm -v $(shell pwd):/app $(DOCKER_IMAGE) make bundle OPENVINO_DIR=/opt/openvino
+	docker run --rm -v $(shell pwd):/app $(DOCKER_IMAGE) bash -c "\
+		mkdir -p /app/libs && \
+		ln -sfn /opt/openvino /app/libs/openvino && \
+		make bundle OPENVINO_DIR=/app/libs/openvino"
 
 

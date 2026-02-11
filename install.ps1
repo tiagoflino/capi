@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $AppName = "capi"
 $InstallDir = Join-Path $env:LOCALAPPDATA $AppName
 $BinDir = Join-Path $InstallDir "bin"
-$RepoOwner = "yourusername"
+$RepoOwner = "tiagoflino"
 $RepoName = "capi"
 $ZipName = "capi-windows-x64.zip"
 

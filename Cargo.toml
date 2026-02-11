@@ -12,7 +12,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Capi Contributors"]
 license = "MIT"
-repository = "https://github.com/yourusername/capi"
+repository = "https://github.com/tiagoflino/capi"
 
 [workspace.dependencies]
 tokio = { version = "1.35", features = ["full"] }

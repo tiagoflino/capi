@@ -4,6 +4,7 @@
   import { onMount, tick } from 'svelte';
   import { selectedModel, currentSessionId, isGenerating, inferenceMetrics, triggerNewChat } from '$lib/stores/app';
   import { marked } from 'marked';
+  import DOMPurify from 'dompurify';
 
   // Local state for chat
   let messages = $state<any[]>([]);
@@ -170,7 +171,7 @@
                  {/if}
               </div>
               <div class="markdown-body">
-                {@html marked.parse(msg.content)}
+                {@html DOMPurify.sanitize(marked.parse(msg.content) as string)}
               </div>
             </div>
           </div>

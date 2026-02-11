@@ -285,20 +285,15 @@ async fn load_model_direct(
         .unwrap_or_else(|| "CPU".to_string());
 
     let model_path = std::path::Path::new(&model.path);
-    println!("Loading model {} from {:?} on device {}", model_id, model_path, device);
 
     let mut session = capi_core::InferenceSession::load_with_lock(model_path, &device, &model_id)
         .map_err(|e| {
-            println!("Error loading model into session: {}", e);
             e.to_string()
         })?;
 
-    println!("Starting chat for session...");
     session.start_chat().map_err(|e| {
-        println!("Error starting chat: {}", e);
         e.to_string()
     })?;
-    println!("Model {} successfully loaded", model_id);
 
     let mut sessions = state.sessions.lock()
         .map_err(|_| "Failed to acquire sessions lock".to_string())?;
@@ -347,7 +342,7 @@ async fn create_chat_session(state: State<'_, AppData>, model_id: String, title:
     let id = uuid::Uuid::new_v4().to_string();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_secs() as i64;
         
     let session = capi_core::db::ChatSession {
@@ -416,7 +411,7 @@ async fn chat_direct(
     if let Some(sid) = session_id {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs() as i64;
 
         let user_msg = capi_core::db::ChatMessage {

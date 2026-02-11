@@ -9,6 +9,10 @@ pub struct GenerationConfig {
     inner: UniquePtr<ffi::GenerationConfigWrapper>,
 }
 
+// SAFETY: GenerationConfig wraps a UniquePtr to a C++ GenerationConfigWrapper.
+// The wrapper only contains POD configuration values (max_tokens, temperature, top_p, etc.)
+// and does not perform any operations that would cause data races. The config is copied
+// into the pipeline before generation, so concurrent reads are safe.
 unsafe impl Send for GenerationConfig {}
 unsafe impl Sync for GenerationConfig {}
 

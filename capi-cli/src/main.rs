@@ -518,7 +518,13 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
 
-            let active_model = models.first().unwrap();
+            let active_model = match models.first() {
+                Some(m) => m,
+                None => {
+                    eprintln!("No models available");
+                    return Ok(());
+                }
+            };
             let model_path = std::path::Path::new(&active_model.path);
 
             let devices = capi_core::detect_devices()?;
@@ -883,7 +889,7 @@ fn find_file_with_extension(dir: &std::path::Path, ext: &str) -> Result<Option<s
 fn format_timestamp(ts: i64) -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_secs() as i64;
 
     let diff = now - ts;

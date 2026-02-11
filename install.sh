@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-REPO_OWNER="yourusername"
+REPO_OWNER="tiagoflino"
 REPO_NAME="capi"
 INSTALL_DIR="$HOME/.capi"
 BIN_DIR="$INSTALL_DIR/bin"
