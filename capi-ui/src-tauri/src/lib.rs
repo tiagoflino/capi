@@ -1,5 +1,7 @@
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::Stdio;
+use tauri_plugin_shell::ShellExt;
+use tauri_plugin_shell::process::CommandChild;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, State};
 use serde::Serialize;
@@ -13,16 +15,14 @@ struct AppData {
 }
 
 struct ServerState {
-    process: Arc<Mutex<Option<Child>>>,
+    process: Arc<Mutex<Option<CommandChild>>>,
 }
 
 #[tauri::command]
-async fn start_server(state: State<'_, ServerState>) -> Result<(), String> {
-    let server_exe = get_server_executable_path();
-
-    let child = Command::new(server_exe)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+async fn start_server(app: tauri::AppHandle, state: State<'_, ServerState>) -> Result<(), String> {
+    let (mut _rx, child) = app.shell()
+        .sidecar("capi-server")
+        .map_err(|e| e.to_string())?
         .spawn()
         .map_err(|e| e.to_string())?;
 
@@ -38,7 +38,7 @@ async fn stop_server(state: State<'_, ServerState>) -> Result<(), String> {
     let mut process = state.process.lock()
         .map_err(|_| "Failed to lock process")?;
 
-    if let Some(mut child) = process.take() {
+    if let Some(child) = process.take() {
         child.kill().map_err(|e| e.to_string())?;
     }
 
@@ -58,10 +58,7 @@ async fn get_server_status(state: State<'_, ServerState>) -> Result<ServerStatus
     let process = state.process.lock()
         .map_err(|_| "Failed to lock process")?;
 
-    let running = process.as_ref()
-        .and_then(|c| c.id().try_into().ok())
-        .map(|_: u32| true)
-        .unwrap_or(false);
+    let running = process.is_some();
 
     let config = capi_core::Config::load()
         .map_err(|e| e.to_string())?;
@@ -552,19 +549,7 @@ fn get_cpu_usage() -> f32 {
     0.0
 }
 
-fn get_server_executable_path() -> PathBuf {
-    let exe_dir = std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf();
 
-    #[cfg(windows)]
-    return exe_dir.join("capi-server.exe");
-
-    #[cfg(not(windows))]
-    exe_dir.join("capi-server")
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -591,6 +576,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(app_data)
         .manage(server_state)
         .invoke_handler(tauri::generate_handler![

@@ -25,20 +25,20 @@ mkdir -p "$INSTALL_DIR/tmp_extract"
 
 # Determine Download URL
 if [ "$VERSION" = "latest" ]; then
-    DOWNLOAD_url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/$TARBALL_NAME"
+    DOWNLOAD_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/$TARBALL_NAME"
 else
-    DOWNLOAD_url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$VERSION/$TARBALL_NAME"
+    DOWNLOAD_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$VERSION/$TARBALL_NAME"
 fi
 
 if [ -n "$LOCAL_PATH" ]; then
     echo "Installing from local file: $LOCAL_PATH"
     tar -xzf "$LOCAL_PATH" -C "$INSTALL_DIR/tmp_extract"
 else
-    echo "Downloading from $DOWNLOAD_url..."
+    echo "Downloading from $DOWNLOAD_URL..."
     if command -v curl >/dev/null 2>&1; then
-        curl -L "$DOWNLOAD_url" -o "$INSTALL_DIR/$TARBALL_NAME"
+        curl -L "$DOWNLOAD_URL" -o "$INSTALL_DIR/$TARBALL_NAME"
     elif command -v wget >/dev/null 2>&1; then
-        wget -O "$INSTALL_DIR/$TARBALL_NAME" "$DOWNLOAD_url"
+        wget -O "$INSTALL_DIR/$TARBALL_NAME" "$DOWNLOAD_URL"
     else
         echo "Error: curl or wget required."
         exit 1
@@ -48,12 +48,17 @@ else
 fi
 
 # Move files into place
-# The tarball structure from build_linux.sh is:
-# bin/capi
-# bin/capi-wrapper
-# lib/*.so
-cp -r "$INSTALL_DIR/tmp_extract/bin" "$INSTALL_DIR/"
-cp -r "$INSTALL_DIR/tmp_extract/lib" "$INSTALL_DIR/"
+# The tarball structure is:
+# capi-linux-x64/bin/capi
+# capi-linux-x64/bin/capi-server...
+# capi-linux-x64/bin/capi-wrapper
+# capi-linux-x64/lib/openvino/...
+
+# We extract into tmp_extract, effectively getting tmp_extract/capi-linux-x64/...
+SOURCE_DIR="$INSTALL_DIR/tmp_extract/capi-linux-x64"
+
+cp -r "$SOURCE_DIR/bin" "$INSTALL_DIR/"
+cp -r "$SOURCE_DIR/lib" "$INSTALL_DIR/"
 rm -rf "$INSTALL_DIR/tmp_extract"
 
 echo "Installed to $INSTALL_DIR"

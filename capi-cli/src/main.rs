@@ -525,7 +525,7 @@ async fn main() -> Result<()> {
             let device = capi_core::select_best_device(&devices, &config.device_preference)
                 .unwrap_or_else(|| "CPU".to_string());
 
-            let session = capi_core::InferenceSession::load(model_path, &device)?;
+            let mut session = capi_core::InferenceSession::load(model_path, &device)?;
             let output = session.generate(&prompt, 50)?;
 
             println!("{}", output);
@@ -554,7 +554,7 @@ async fn main() -> Result<()> {
                 .unwrap_or_else(|| "CPU".to_string());
 
             println!("Loading model on {}...", device);
-            let session = capi_core::InferenceSession::load(model_path, &device)?;
+            let mut session = capi_core::InferenceSession::load(model_path, &device)?;
 
             let test_prompts = vec![
                 "Hello, how are you?",
