@@ -20,6 +20,8 @@ jobs:
       run: make docker-build
 
     - name: Run Tests in Docker
-      run: make docker-run-test
+      run: |
+        make docker-run-test
+        sudo chown -R $(id -u):$(id -g) target
 
 

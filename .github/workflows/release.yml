@@ -69,6 +69,7 @@ jobs:
         run: |
           make docker-build
           make docker-run-bundle
+          sudo chown -R $(id -u):$(id -g) target/release
 
       - name: Prepare Artifcats
         shell: bash
