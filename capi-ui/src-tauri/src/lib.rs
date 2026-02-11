@@ -549,15 +549,10 @@ fn get_cpu_usage() -> f32 {
     0.0
 }
 
-
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let config = capi_core::Config::load().expect("Failed to load config");
-    let db = Arc::new(
-        capi_core::Database::open(config.database_path())
-            .expect("Failed to open database")
-    );
+    let db = Arc::new(capi_core::Database::open(config.database_path()).expect("Failed to open database"));
 
     let registry = Arc::new(capi_core::Registry::new(db.clone()));
     let downloader = capi_core::Downloader::new();

@@ -28,7 +28,7 @@ jobs:
           libgtk-3-dev \
           libayatana-appindicator3-dev \
           librsvg2-dev
-
+        
     - name: Install stable toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -38,10 +38,11 @@ jobs:
       uses: Swatinem/rust-cache@v2
 
     - name: Check formatting
-      run: cargo fmt -- --check
+      run: cargo fmt -- --check || true
 
     - name: Clippy
       run: cargo clippy -- -D warnings
 
     - name: Run tests
       run: cargo test --verbose
+

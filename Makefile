@@ -68,3 +68,4 @@ bundle: download-deps
 	@chmod +x target/release/capi-linux-x64/bin/capi-wrapper
 	@cd target/release && tar -czf capi-linux-x64.tar.gz capi-linux-x64
 	@echo "Portable tarball created at target/release/capi-linux-x64.tar.gz"
+
