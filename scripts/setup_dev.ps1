@@ -2,7 +2,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$OpenVinoUrl = "https://storage.openvinotoolkit.org/repositories/openvino_genai/packages/2024.5/windows/openvino_genai_windows_2024.5.0.0_x86_64.zip"
+$OpenVinoUrl = "https://storage.openvinotoolkit.org/repositories/openvino_genai/packages/2025.4.1/windows/openvino_genai_windows_2025.4.1.0_x86_64.zip"
 $LibsDir = Join-Path (Get-Location) "libs"
 $OpenVinoDir = Join-Path $LibsDir "openvino"
 $ZipPath = Join-Path $LibsDir "openvino_genai.zip"
