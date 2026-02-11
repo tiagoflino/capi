@@ -23,12 +23,14 @@
   },
   "bundle": {
     "active": true,
+    "externalBin": [
+      "bin/capi-server"
+    ],
     "targets": [
       "nsis",
       "msi",
       "deb",
-      "rpm",
-      "appimage"
+      "rpm"
     ],
     "icon": [
       "icons/32x32.png",
@@ -38,9 +40,6 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "../../libs/openvino/runtime/bin/intel64/*.dll",
-      "../../libs/openvino/runtime/3rdparty/tbb/bin/*.dll",
-      "../../libs/openvino/runtime/bin/intel64/plugins.xml",
       "../../libs/openvino/runtime/lib/intel64/*.so*",
       "../../libs/openvino/runtime/3rdparty/tbb/lib/*.so*"
     ]

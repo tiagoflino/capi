@@ -1,5 +1,6 @@
 /target
 /dist
+/capi-ui/src-tauri/bin/
 **/*.rs.bk
 *.pdb
 
