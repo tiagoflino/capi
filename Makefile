@@ -75,7 +75,7 @@ docker-build:
 	docker build -t $(DOCKER_IMAGE) -f Dockerfile.build .
 
 docker-run-test:
-	docker run --rm -v $(shell pwd):/app $(DOCKER_IMAGE) cargo test --all-targets --all-features
+	docker run --rm -v $(shell pwd):/app $(DOCKER_IMAGE) cargo test --workspace --exclude capi-ui --all-targets --all-features
 
 docker-run-bundle:
 	docker run --rm -v $(shell pwd):/app $(DOCKER_IMAGE) make bundle OPENVINO_DIR=/opt/openvino
