@@ -231,7 +231,7 @@ fn get_intel_gpu_name(device_id: &str) -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn detect_intel_gpu() -> Option<GpuResource> {
+fn detect_intel_gpu(_sys: &System) -> Vec<GpuResource> {
     use std::process::Command;
 
     let output = Command::new("powershell")
@@ -250,7 +250,7 @@ fn detect_intel_gpu() -> Option<GpuResource> {
         if parts.len() >= 2 {
             let name = parts[0].trim().to_string();
             if let Ok(adapter_ram) = parts[1].trim().parse::<u64>() {
-                return Some(GpuResource {
+                return vec![GpuResource {
                     name,
                     total_vram_bytes: adapter_ram,
                     available_vram_bytes: adapter_ram,
@@ -258,17 +258,17 @@ fn detect_intel_gpu() -> Option<GpuResource> {
                     usage_percent: 0.0,
                     frequency_mhz: 0,
                     max_frequency_mhz: 0,
-                });
+                }];
             }
         }
     }
 
-    None
+    Vec::new()
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-fn detect_intel_gpu() -> Option<GpuResource> {
-    None
+fn detect_intel_gpu(_sys: &System) -> Vec<GpuResource> {
+    Vec::new()
 }
 
 #[cfg(target_os = "linux")]
