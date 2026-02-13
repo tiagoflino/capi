@@ -25,7 +25,7 @@ futures = "0.3"
 async-stream = "0.3"
 sysinfo = "0.30"
 which = "6.0"
-nvml-wrapper = { version = "0.9", optional = true }
+nvml-wrapper = { version = "0.12", optional = true }
 cxx = "1.0"
 
 [build-dependencies]
