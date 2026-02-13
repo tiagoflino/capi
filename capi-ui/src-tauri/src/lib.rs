@@ -3,7 +3,7 @@ use std::process::Stdio;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandChild;
 use std::sync::{Arc, Mutex};
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 use serde::Serialize;
 
 struct AppData {
@@ -20,9 +20,21 @@ struct ServerState {
 
 #[tauri::command]
 async fn start_server(app: tauri::AppHandle, state: State<'_, ServerState>) -> Result<(), String> {
+    let resource_dir = app.path().resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+    let lib_dir = resource_dir.join("lib");
+
+    let mut lib_path = lib_dir.to_string_lossy().to_string();
+    if let Ok(existing) = std::env::var("LD_LIBRARY_PATH") {
+        if !existing.is_empty() {
+            lib_path = format!("{}:{}", lib_path, existing);
+        }
+    }
+
     let (mut _rx, child) = app.shell()
         .sidecar("capi-server")
         .map_err(|e| e.to_string())?
+        .env("LD_LIBRARY_PATH", &lib_path)
         .spawn()
         .map_err(|e| e.to_string())?;
 

@@ -39,9 +39,8 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../../libs/openvino/runtime/lib/intel64/*.so*",
-      "../../libs/openvino/runtime/3rdparty/tbb/lib/*.so*"
-    ]
+    "resources": {
+      "../../target/release/lib/*": "lib/"
+    }
   }
 }
