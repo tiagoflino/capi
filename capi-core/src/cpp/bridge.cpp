@@ -8,15 +8,10 @@ std::unique_ptr<LLMPipelineWrapper> create_pipeline(
     rust::Str model_path,
     rust::Str device
 ) {
-    try {
-        return std::make_unique<LLMPipelineWrapper>(
-            std::string(model_path),
-            std::string(device)
-        );
-    } catch (const std::exception& e) {
-        // Return nullptr on failure - Rust side will handle
-        return nullptr;
-    }
+    return std::make_unique<LLMPipelineWrapper>(
+        std::string(model_path),
+        std::string(device)
+    );
 }
 
 std::unique_ptr<GenerationConfigWrapper> create_generation_config() {

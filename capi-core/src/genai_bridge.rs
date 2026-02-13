@@ -38,8 +38,8 @@ pub mod ffi {
         type TokenizerWrapper;
 
         // Factory functions
-        fn create_pipeline(model_path: &str, device: &str) -> UniquePtr<LLMPipelineWrapper>;
-        fn create_generation_config() -> UniquePtr<GenerationConfigWrapper>;
+        fn create_pipeline(model_path: &str, device: &str) -> Result<UniquePtr<LLMPipelineWrapper>>;
+        fn create_generation_config() -> Result<UniquePtr<GenerationConfigWrapper>>;
 
         // Tokenizer methods
         fn pipeline_get_tokenizer(pipeline: &LLMPipelineWrapper) -> UniquePtr<TokenizerWrapper>;

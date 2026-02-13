@@ -19,7 +19,8 @@ unsafe impl Sync for GenerationConfig {}
 impl GenerationConfig {
     /// Create a new GenerationConfig with default settings.
     pub fn new() -> Result<Self> {
-        let inner = ffi::create_generation_config();
+        let inner = ffi::create_generation_config()
+            .map_err(|e| crate::inference::genai::GenAIError::General(e.to_string()))?;
         Ok(Self { inner })
     }
 

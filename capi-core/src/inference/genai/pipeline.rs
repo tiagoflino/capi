@@ -28,12 +28,9 @@ impl LLMPipeline {
     /// * `model_path` - Path to the model directory
     /// * `device` - Device to use (e.g., "CPU", "GPU", "NPU")
     pub fn new(model_path: &str, device: &str) -> Result<Self> {
-        let inner = ffi::create_pipeline(model_path, device);
+        let inner = ffi::create_pipeline(model_path, device)
+            .map_err(|e| GenAIError::General(e.to_string()))?;
         
-        if inner.is_null() {
-            return Err(GenAIError::PipelineCreation);
-        }
-
         Ok(Self { inner })
     }
 
