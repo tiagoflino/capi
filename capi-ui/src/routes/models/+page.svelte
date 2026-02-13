@@ -254,7 +254,7 @@
   {#if loadingQuants}
     <div class="modal-loading">
       <div class="spinner"></div>
-      <p>Fetching quantized artifacts...</p>
+      <p>Finding available versions...</p>
     </div>
   {:else if quantizedVersions.length === 0}
     <div class="modal-empty">
@@ -278,10 +278,10 @@
   {/if}
 </Modal>
 
-<Modal isOpen={showFileModal} onClose={() => showFileModal = false} title="Deployment Specification">
+<Modal isOpen={showFileModal} onClose={() => showFileModal = false} title="Select File to Download">
   {#if downloading}
     <div class="download-state">
-      <h3 class="dl-title">Transferring Neural Weights</h3>
+      <h3 class="dl-title">Downloading...</h3>
       <div class="progress-wrap">
         <div class="dl-track">
           <div class="dl-fill" style="width: {downloadProgress}%;"></div>
@@ -292,7 +292,7 @@
   {:else if loadingFiles}
     <div class="modal-loading">
       <div class="spinner"></div>
-      <p>Indexing remote weights...</p>
+      <p>Fetching file list...</p>
     </div>
   {:else if modelFiles.length === 0}
     <div class="modal-empty"><p>No compatible GGUF weights found</p></div>
@@ -318,7 +318,7 @@
 </Modal>
 
 <style>
-  .models-page { height: 100%; overflow-y: auto; background: #fcfaf7; padding-bottom: 100px; }
+  .models-page { height: 100%; overflow-y: auto; background: #ffffff; padding-bottom: 100px; }
   .content-container { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
 
   .section-header { margin-bottom: 48px; }

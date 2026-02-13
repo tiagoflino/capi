@@ -13,10 +13,16 @@
 
   // Subscribe to changes that require refreshing lists
   $effect(() => {
-    // If generation stops, we might want to refresh sessions order
+    // Reload sessions if generation stops
     if (!$isGenerating) {
       loadSessions();
     }
+  });
+
+  // Reload models when navigating (e.g. returning from Models page)
+  $effect(() => {
+    const _ = $page.url.pathname;
+    loadModels();
   });
 
   onMount(async () => {
@@ -192,7 +198,7 @@
           </button>
         </div>
         {#if loadingStatus}
-          <div class="status-tiny">{loadingStatus}</div>
+          <div class="status-tiny {loadingStatus === 'Ready' ? 'success' : ''}">{loadingStatus}</div>
         {/if}
       </div>
       
@@ -351,7 +357,7 @@
   }
 
   .model-row { display: flex; gap: 8px; }
-  select { flex: 1; padding: 6px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); font-size: 12px; }
+  select { flex: 1; min-width: 0; padding: 6px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); font-size: 12px; text-overflow: ellipsis; }
   .load-btn { width: 32px; background: #3d3b38; color: white; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .load-btn:hover:not(:disabled) { background: #000; }
   .load-btn:disabled { opacity: 0.3; }
@@ -363,6 +369,7 @@
   .perf-row strong { color: #b87333; }
 
   .spinner { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
-  .status-tiny { font-size: 10px; color: #b87333; margin-top: 4px; }
+  .status-tiny { font-size: 10px; color: #b87333; margin-top: 4px; font-weight: 700; }
+  .status-tiny.success { color: #22c55e; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>

@@ -19,7 +19,7 @@
     height: 100vh;
     width: 100vw;
     overflow: hidden;
-    background: #fbf9f6;
+    background: #ffffff;
   }
 
   .main-viewport {

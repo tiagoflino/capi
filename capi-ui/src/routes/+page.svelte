@@ -224,7 +224,7 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: #fdfcfb;
+    background: #ffffff;
     position: relative;
     overflow: hidden;
   }
@@ -314,7 +314,7 @@
     left: 0;
     right: 0;
     padding: 32px 24px;
-    background: linear-gradient(to top, #fdfcfb 70%, transparent);
+    background: linear-gradient(to top, #ffffff 70%, transparent);
     display: flex;
     justify-content: center;
   }
