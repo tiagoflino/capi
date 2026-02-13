@@ -86,7 +86,7 @@ docker-build:
 	docker build -t $(DOCKER_IMAGE) -f Dockerfile.build .
 
 docker-run-test:
-	docker run --rm --user $(shell id -u):$(shell id -g) -v $(shell pwd):/app $(DOCKER_IMAGE) cargo test --workspace --exclude capi-ui --all-targets --all-features
+	docker run --rm --user $(shell id -u):$(shell id -g) -v $(shell pwd):/app -e HOME=/tmp $(DOCKER_IMAGE) cargo test --workspace --exclude capi-ui --all-targets --all-features
 
 docker-run-bundle:
 	docker run --rm --user $(shell id -u):$(shell id -g) -v $(shell pwd):/app $(DOCKER_IMAGE) bash -c "\
