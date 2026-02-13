@@ -24,6 +24,9 @@ enum Commands {
     Run {
         /// Model ID or name
         model: String,
+        /// Device to run inference on (e.g., CPU, GPU)
+        #[arg(long, short)]
+        device: Option<String>,
     },
     /// Generate single response (non-interactive)
     Generate {
@@ -345,7 +348,7 @@ async fn main() -> Result<()> {
                 }
             }
         },
-        Commands::Run { model } => {
+        Commands::Run { model, device } => {
             use std::io::{self, Write};
             use crossterm::{
                 event::{self, Event, KeyCode, KeyEventKind},
@@ -377,12 +380,14 @@ async fn main() -> Result<()> {
             }
 
             let devices = capi_core::detect_devices()?;
-            let device = capi_core::select_best_device(&devices, &config.device_preference)
-                .unwrap_or_else(|| "CPU".to_string());
+            let selected_device = device.unwrap_or_else(|| {
+                capi_core::select_best_device(&devices, &config.device_preference)
+                    .unwrap_or_else(|| "CPU".to_string())
+            });
 
-            println!("Loading on device: {}...", device);
+            println!("Loading on device: {}...", selected_device);
 
-            let mut session = capi_core::InferenceSession::load(model_path, &device)?;
+            let mut session = capi_core::InferenceSession::load(model_path, &selected_device)?;
             session.start_chat()?;
 
             println!("Ready! Type your message (or /exit to quit, ESC to stop generation)\n");
