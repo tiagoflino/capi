@@ -84,7 +84,7 @@ fn detect_intel_gpu(sys: &System) -> Vec<GpuResource> {
 
 /// Detect Intel GPU using xe driver sysfs paths (Meteor Lake, Lunar Lake, etc.)
 #[cfg(target_os = "linux")]
-fn detect_intel_gpu_xe(sys: &System) -> Vec<GpuResource> {
+fn detect_intel_gpu_xe(_sys: &System) -> Vec<GpuResource> {
     let mut gpus = Vec::new();
 
     for card in 0..10 {
