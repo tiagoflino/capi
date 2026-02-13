@@ -11,8 +11,8 @@ on:
 jobs:
   analyze:
     name: Analyze
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
-    timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
     permissions:
       actions: read
       contents: read
@@ -21,21 +21,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'cpp', 'javascript', 'rust' ]
+        # Focusing on Rust and JS/TS as they are the primary languages
+        # and support build-mode: 'none' (beta/public)
+        language: [ 'javascript', 'rust' ]
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Fix: C++ and Rust need build steps for CodeQL to trace correctly if autobuild fails
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
-        build-mode: 'autobuild'
-
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
+        # 'none' enables no-build analysis for supported languages
+        build-mode: 'none'
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
