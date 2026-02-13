@@ -23,7 +23,7 @@ tower = "0.4"
 tower-http = { version = "0.5", features = ["fs", "cors"] }
 futures = "0.3"
 async-stream = "0.3"
-sysinfo = "0.30"
+sysinfo = "0.38"
 which = "6.0"
 nvml-wrapper = { version = "0.9", optional = true }
 cxx = "1.0"
