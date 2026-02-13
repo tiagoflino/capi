@@ -1,5 +1,3 @@
-# install.ps1
-
 param (
     [string]$Version = "latest",
     [string]$LocalPath = ""
@@ -7,7 +5,6 @@ param (
 
 $ErrorActionPreference = "Stop"
 
-# Configuration
 $AppName = "capi"
 $InstallDir = Join-Path $env:LOCALAPPDATA $AppName
 $BinDir = Join-Path $InstallDir "bin"
@@ -15,7 +12,6 @@ $RepoOwner = "tiagoflino"
 $RepoName = "capi"
 $ZipName = "capi-windows-x64.zip"
 
-# Check Architecture
 if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
     Write-Error "This installer only supports Windows x64."
     exit 1
@@ -23,7 +19,6 @@ if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
 
 Write-Host "Installing $AppName..."
 
-# Create Install Directory
 if (Test-Path $InstallDir) {
     Remove-Item -Path $InstallDir -Recurse -Force
 }
@@ -32,11 +27,9 @@ New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
 $ZipDestination = Join-Path $InstallDir $ZipName
 
 if ($LocalPath -ne "") {
-    # Install from local file
     Write-Host "Installing from local file: $LocalPath"
     Copy-Item -Path $LocalPath -Destination $ZipDestination -Force
 } else {
-    # Determine Download URL
     $DownloadUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/$Version/$ZipName" 
     if ($Version -eq "latest") {
         $DownloadUrl = "https://github.com/$RepoOwner/$RepoName/releases/latest/download/$ZipName"
@@ -53,12 +46,10 @@ if ($LocalPath -ne "") {
     }
 }
 
-# Extract
 Write-Host "Extracting to $BinDir..."
 Expand-Archive -Path $ZipDestination -DestinationPath $BinDir -Force
 Remove-Item $ZipDestination
 
-# Add to PATH
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($UserPath -notlike "*$BinDir*") {
     Write-Host "Adding $BinDir to PATH..."
@@ -71,5 +62,6 @@ if ($UserPath -notlike "*$BinDir*") {
 
 Write-Host "--------------------------------------------------"
 Write-Host "$AppName installed successfully!"
-Write-Host "Run '$AppName' to start."
+Write-Host "Run 'capi serve' to start the server."
+Write-Host "Run 'capi run <model>' for interactive chat."
 Write-Host "--------------------------------------------------"

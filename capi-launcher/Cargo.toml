@@ -1,19 +1,20 @@
 [package]
-name = "capi-cli"
+name = "capi-launcher"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "capi-engine"
+name = "capi"
 path = "src/main.rs"
 
 [dependencies]
-capi-core = { path = "../capi-core" }
-clap = { workspace = true }
+reqwest = { workspace = true }
 tokio = { workspace = true }
+dirs = { workspace = true }
 anyhow = { workspace = true }
-dialoguer = { workspace = true }
-crossterm = "0.28"
-ratatui = "0.29"
+flate2 = "1.0"
+tar = "0.4"
+indicatif = "0.17"
+futures-util = { workspace = true }

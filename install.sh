@@ -5,25 +5,22 @@ REPO_OWNER="tiagoflino"
 REPO_NAME="capi"
 INSTALL_DIR="$HOME/.capi"
 BIN_DIR="$INSTALL_DIR/bin"
-LIB_DIR="$INSTALL_DIR/lib"
+LIB_DIR="$BIN_DIR/lib"
 VERSION="latest"
 TARBALL_NAME="capi-linux-x64.tar.gz"
 
 echo "Installing Capi..."
 
-# Check Architecture
 ARCH=$(uname -m)
 if [ "$ARCH" != "x86_64" ]; then
     echo "Error: This installer only supports x86_64 Linux."
     exit 1
 fi
 
-# Prepare Directory
 mkdir -p "$INSTALL_DIR"
 rm -rf "$INSTALL_DIR/tmp_extract"
 mkdir -p "$INSTALL_DIR/tmp_extract"
 
-# Determine Download URL
 if [ "$VERSION" = "latest" ]; then
     DOWNLOAD_URL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/$TARBALL_NAME"
 else
@@ -47,23 +44,20 @@ else
     rm "$INSTALL_DIR/$TARBALL_NAME"
 fi
 
-# Move files into place
-# The tarball structure is:
-# capi-linux-x64/bin/capi
-# capi-linux-x64/bin/capi-server...
-# capi-linux-x64/bin/capi-wrapper
-# capi-linux-x64/lib/openvino/...
-
-# We extract into tmp_extract, effectively getting tmp_extract/capi-linux-x64/...
 SOURCE_DIR="$INSTALL_DIR/tmp_extract/capi-linux-x64"
 
-cp -r "$SOURCE_DIR/bin" "$INSTALL_DIR/"
-cp -r "$SOURCE_DIR/lib" "$INSTALL_DIR/"
+mkdir -p "$BIN_DIR"
+cp "$SOURCE_DIR/bin/capi" "$BIN_DIR/"
+cp "$SOURCE_DIR/bin/capi-engine" "$BIN_DIR/"
+cp "$SOURCE_DIR/bin/capi-server" "$BIN_DIR/"
+cp "$SOURCE_DIR/bin/capi-ui" "$BIN_DIR/" 2>/dev/null || true
+mkdir -p "$LIB_DIR"
+cp "$SOURCE_DIR/bin/lib/"* "$LIB_DIR/"
+
 rm -rf "$INSTALL_DIR/tmp_extract"
 
 echo "Installed to $INSTALL_DIR"
 
-# Shell Configuration
 SHELL_NAME=$(basename "$SHELL")
 RC_FILE=""
 
@@ -77,17 +71,15 @@ if [ -n "$RC_FILE" ]; then
     if ! grep -q "$BIN_DIR" "$RC_FILE"; then
         echo "Adding $BIN_DIR to PATH in $RC_FILE..."
         echo "" >> "$RC_FILE"
-        echo "# Capi" >> "$RC_FILE"
         echo "export PATH=\"\$PATH:$BIN_DIR\"" >> "$RC_FILE"
-        echo "Run 'source $RC_FILE' or restart your terminal to use 'capi-wrapper' (or just 'capi' if you prefer)."
+        echo "Run 'source $RC_FILE' or restart your terminal."
     else
         echo "$BIN_DIR is already in PATH."
     fi
 fi
 
-# Suggestion
 echo "--------------------------------------------------"
 echo "Installation complete!"
-echo "To run the app:"
-echo "  $BIN_DIR/capi-wrapper"
+echo "Run 'capi serve' to start the server."
+echo "Run 'capi run <model>' for interactive chat."
 echo "--------------------------------------------------"
