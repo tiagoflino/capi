@@ -87,6 +87,11 @@ Copy-Item -Path (Join-Path $ReleaseDir "capi-engine.exe") -Destination $TempBund
 Copy-Item -Path (Join-Path $ReleaseDir "capi-server.exe") -Destination $TempBundle
 
 $OpenVinoBin = Join-Path $env:OPENVINO_ROOT "runtime\bin\intel64"
+# Check if there is a specific Release folder (common in Windows packages)
+if (Test-Path (Join-Path $OpenVinoBin "Release")) {
+    $OpenVinoBin = Join-Path $OpenVinoBin "Release"
+}
+
 $TbbBin = Join-Path $env:OPENVINO_ROOT "runtime\3rdparty\tbb\bin"
 $LibDir = Join-Path $TempBundle "lib"
 

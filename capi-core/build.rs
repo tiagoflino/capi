@@ -52,7 +52,11 @@ fn main() {
         });
 
     if let Some(root) = &openvino_root {
-        println!("cargo:rustc-link-search=native={}/runtime/lib/intel64", root.display());
+        if env::var("CARGO_CFG_TARGET_OS").unwrap() == "windows" {
+            println!("cargo:rustc-link-search=native={}/runtime/lib/intel64/Release", root.display());
+        } else {
+            println!("cargo:rustc-link-search=native={}/runtime/lib/intel64", root.display());
+        }
         println!("cargo:rustc-link-search=native={}/runtime/3rdparty/tbb/lib", root.display());
     } else {
         println!("cargo:rustc-link-search=native=/usr/lib");
