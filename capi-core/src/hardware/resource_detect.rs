@@ -232,6 +232,11 @@ fn get_intel_gpu_name(device_id: &str) -> String {
 
 #[cfg(target_os = "windows")]
 fn detect_intel_gpu(_sys: &System) -> Vec<GpuResource> {
+    detect_intel_gpu_windows_impl().unwrap_or_default()
+}
+
+#[cfg(target_os = "windows")]
+fn detect_intel_gpu_windows_impl() -> Option<Vec<GpuResource>> {
     use std::process::Command;
 
     let output = Command::new("powershell")
@@ -244,26 +249,32 @@ fn detect_intel_gpu(_sys: &System) -> Vec<GpuResource> {
 
     if output.status.success() {
         let output_str = String::from_utf8(output.stdout).ok()?;
-        let line = output_str.lines().next()?;
-        let parts: Vec<&str> = line.split('|').collect();
+        let mut gpus = Vec::new();
 
-        if parts.len() >= 2 {
-            let name = parts[0].trim().to_string();
-            if let Ok(adapter_ram) = parts[1].trim().parse::<u64>() {
-                return vec![GpuResource {
-                    name,
-                    total_vram_bytes: adapter_ram,
-                    available_vram_bytes: adapter_ram,
-                    device_type: DeviceType::GPU,
-                    usage_percent: 0.0,
-                    frequency_mhz: 0,
-                    max_frequency_mhz: 0,
-                }];
+        for line in output_str.lines() {
+             let parts: Vec<&str> = line.split('|').collect();
+             if parts.len() >= 2 {
+                let name = parts[0].trim().to_string();
+                if let Ok(adapter_ram) = parts[1].trim().parse::<u64>() {
+                    gpus.push(GpuResource {
+                        name,
+                        total_vram_bytes: adapter_ram,
+                        available_vram_bytes: adapter_ram, // Windows doesn't easily give available VRAM without PDH/D3D
+                        device_type: DeviceType::GPU,
+                        usage_percent: 0.0,
+                        frequency_mhz: 0,
+                        max_frequency_mhz: 0,
+                    });
+                }
             }
+        }
+        
+        if !gpus.is_empty() {
+            return Some(gpus);
         }
     }
 
-    Vec::new()
+    None
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
