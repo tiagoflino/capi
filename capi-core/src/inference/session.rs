@@ -182,7 +182,7 @@ impl InferenceSession {
         Ok((result.text, metrics))
     }
 
-    pub fn generate_stream<F>(&mut self, prompt: &str, max_tokens: usize, mut callback: F) -> Result<(String, InferenceMetrics)> 
+    pub fn generate_stream<F>(&mut self, prompt: &str, max_tokens: usize, callback: F) -> Result<(String, InferenceMetrics)> 
     where F: FnMut(&str) -> bool
     {
         let mut config = GenerationConfig::new()?;
@@ -190,7 +190,7 @@ impl InferenceSession {
         self.generate_stream_config(prompt, &config, callback)
     }
 
-    pub fn generate_stream_config<F>(&mut self, prompt: &str, config: &GenerationConfig, callback: F) -> Result<(String, InferenceMetrics)> 
+    pub fn generate_stream_config<F>(&mut self, prompt: &str, config: &GenerationConfig, mut callback: F) -> Result<(String, InferenceMetrics)> 
     where F: FnMut(&str) -> bool
     {
         // Estimate prompt tokens if possible
