@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
     
     // Override config with CLI args
     if let Some(port) = args.port {
-        config.server.port = port;
+        config.server_port = port;
     }
     
     // Initialize core components
@@ -103,7 +103,7 @@ async fn main() -> Result<()> {
     let app = capi_core::create_router(state);
     
     // Construct address from host and port
-    let addr_str = format!("{}:{}", args.host, config.server.port);
+    let addr_str = format!("{}:{}", args.host, config.server_port);
     let listener = tokio::net::TcpListener::bind(&addr_str).await
         .context(format!("Failed to bind to address: {}", addr_str))?;
 

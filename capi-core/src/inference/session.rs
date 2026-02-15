@@ -1,4 +1,4 @@
-use super::genai::LLMPipeline;
+use super::genai::{LLMPipeline, GenerationConfig};
 use anyhow::Result;
 use std::path::Path;
 use crate::hardware::{detect_system_resources, validate_model_load, ValidationResult};
@@ -153,7 +153,13 @@ impl InferenceSession {
     }
 
     pub fn generate_with_metrics(&mut self, prompt: &str, max_tokens: usize) -> Result<(String, InferenceMetrics)> {
-        let result = self.pipeline.generate_with_metrics(prompt, max_tokens)
+        let mut config = GenerationConfig::new()?;
+        config.set_max_new_tokens(max_tokens)?;
+        self.generate_with_metrics_config(prompt, &config)
+    }
+
+    pub fn generate_with_metrics_config(&mut self, prompt: &str, config: &GenerationConfig) -> Result<(String, InferenceMetrics)> {
+        let result = self.pipeline.generate_with_metrics(prompt, config)
             .map_err(|e| anyhow::anyhow!("Generation failed: {}", e))?;
 
         let (throughput, _) = result.metrics.throughput();
@@ -179,10 +185,18 @@ impl InferenceSession {
     pub fn generate_stream<F>(&mut self, prompt: &str, max_tokens: usize, mut callback: F) -> Result<(String, InferenceMetrics)> 
     where F: FnMut(&str) -> bool
     {
+        let mut config = GenerationConfig::new()?;
+        config.set_max_new_tokens(max_tokens)?;
+        self.generate_stream_config(prompt, &config, callback)
+    }
+
+    pub fn generate_stream_config<F>(&mut self, prompt: &str, config: &GenerationConfig, callback: F) -> Result<(String, InferenceMetrics)> 
+    where F: FnMut(&str) -> bool
+    {
         // Estimate prompt tokens if possible
         let _prompt_tokens = self.pipeline.count_tokens(prompt);
         
-        let result = self.pipeline.generate_stream(prompt, max_tokens, |token| {
+        let result = self.pipeline.generate_stream(prompt, config, |token| {
             callback(token)
         })?;
 
@@ -194,8 +208,6 @@ impl InferenceSession {
         let num_output = result.metrics.num_generated_tokens();
 
         // Update session context size
-        // Note: OpenVINO GenAI in chat mode handles history, 
-        // but we want to know the total "active" context.
         self.context_tokens = num_input + num_output;
 
         let metrics = InferenceMetrics {

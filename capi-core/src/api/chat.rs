@@ -155,7 +155,6 @@ async fn create_non_streaming_response(
         .join("\n");
 
     let full_prompt = conversation + "\nAssistant:";
-    let full_prompt = conversation + "\nAssistant:";
     let mut config = crate::inference::genai::GenerationConfig::new()?;
     if let Some(max_tokens) = payload.max_tokens {
         config.set_max_new_tokens(max_tokens)?;
@@ -194,7 +193,7 @@ async fn create_non_streaming_response(
         }
     }
 
-    let (response_text, metrics) = session_guard.generate_with_metrics(&full_prompt, &config)?;
+    let (response_text, metrics) = session_guard.generate_with_metrics_config(&full_prompt, &config)?;
 
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
@@ -281,7 +280,6 @@ fn create_streaming_response(
             .join("\n");
 
         let full_prompt = conversation + "\nAssistant:";
-        let full_prompt = conversation + "\nAssistant:";
         
         // Build configuration
         let mut config = match crate::inference::genai::GenerationConfig::new() {
@@ -349,7 +347,7 @@ fn create_streaming_response(
         tokio::task::spawn_blocking(move || {
             let mut session_guard = session_clone.blocking_write();
             // We need to pass the config by reference to the session method
-            session_guard.generate_stream(&prompt_clone, &config, move |token| {
+            session_guard.generate_stream_config(&prompt_clone, &config, move |token| {
                 tx.send(token.to_string()).ok();
                 true
             })
