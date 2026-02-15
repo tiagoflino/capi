@@ -76,6 +76,11 @@ pub mod ffi {
         fn config_set_top_k(config: Pin<&mut GenerationConfigWrapper>, top_k: usize);
         fn config_set_do_sample(config: Pin<&mut GenerationConfigWrapper>, do_sample: bool);
         fn config_set_stop_strings(config: Pin<&mut GenerationConfigWrapper>, stop_strings: Vec<String>);
+        fn config_set_frequency_penalty(config: Pin<&mut GenerationConfigWrapper>, frequency_penalty: f32);
+        fn config_set_presence_penalty(config: Pin<&mut GenerationConfigWrapper>, presence_penalty: f32);
+        fn config_set_repetition_penalty(config: Pin<&mut GenerationConfigWrapper>, repetition_penalty: f32);
+        fn config_set_rng_seed(config: Pin<&mut GenerationConfigWrapper>, seed: usize);
+        fn config_set_logprobs(config: Pin<&mut GenerationConfigWrapper>, logprobs: usize);
     }
 }
 

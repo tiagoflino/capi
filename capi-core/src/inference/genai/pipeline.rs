@@ -53,11 +53,8 @@ impl LLMPipeline {
         Ok(text)
     }
 
-    /// Generate text and return performance metrics.
-    pub fn generate_with_metrics(&self, prompt: &str, max_tokens: usize) -> Result<GenerationResult> {
-        let mut config = GenerationConfig::new()?;
-        config.set_max_new_tokens(max_tokens)?;
-        
+    /// Generate text and return performance metrics using full configuration.
+    pub fn generate_with_metrics(&self, prompt: &str, config: &GenerationConfig) -> Result<GenerationResult> {
         let result = ffi::pipeline_generate_with_metrics(&self.inner, prompt, config.inner());
         
         Ok(GenerationResult {
@@ -72,18 +69,16 @@ impl LLMPipeline {
     /// * `prompt` - The input prompt
     /// * `max_tokens` - Maximum number of tokens to generate
     /// * `callback` - Function called with each generated token, return false to stop
+    /// Generate text with streaming using full configuration.
     pub fn generate_stream<F>(
         &self,
         prompt: &str,
-        max_tokens: usize,
+        config: &GenerationConfig,
         callback: F,
     ) -> Result<GenerationResult>
     where
         F: FnMut(&str) -> bool,
     {
-        let mut config = GenerationConfig::new()?;
-        config.set_max_new_tokens(max_tokens)?;
-        
         let mut streamer = StreamerCallback {
             cb: Box::new(callback),
             buffer: Vec::new(),

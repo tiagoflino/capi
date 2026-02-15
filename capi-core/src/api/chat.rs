@@ -29,6 +29,15 @@ pub struct ChatCompletionRequest {
     pub stream: Option<bool>,
     pub temperature: Option<f32>,
     pub max_tokens: Option<usize>,
+    pub top_p: Option<f32>,
+    pub top_k: Option<usize>,
+    pub frequency_penalty: Option<f32>,
+    pub presence_penalty: Option<f32>,
+    pub repetition_penalty: Option<f32>,
+    pub seed: Option<usize>,
+    pub stop: Option<Vec<String>>,
+    pub logprobs: Option<bool>,
+    pub top_logprobs: Option<usize>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -146,9 +155,46 @@ async fn create_non_streaming_response(
         .join("\n");
 
     let full_prompt = conversation + "\nAssistant:";
-    let max_tokens = payload.max_tokens.unwrap_or(4096);
+    let full_prompt = conversation + "\nAssistant:";
+    let mut config = crate::inference::genai::GenerationConfig::new()?;
+    if let Some(max_tokens) = payload.max_tokens {
+        config.set_max_new_tokens(max_tokens)?;
+    } else {
+        config.set_max_new_tokens(4096)?;
+    }
 
-    let (response_text, metrics) = session_guard.generate_with_metrics(&full_prompt, max_tokens)?;
+    if let Some(temp) = payload.temperature {
+        config.set_temperature(temp)?;
+    }
+    if let Some(top_p) = payload.top_p {
+        config.set_top_p(top_p)?;
+    }
+    if let Some(top_k) = payload.top_k {
+        config.set_top_k(top_k)?;
+    }
+    if let Some(freq_pen) = payload.frequency_penalty {
+        config.set_frequency_penalty(freq_pen)?;
+    }
+    if let Some(pres_pen) = payload.presence_penalty {
+        config.set_presence_penalty(pres_pen)?;
+    }
+    if let Some(rep_pen) = payload.repetition_penalty {
+        config.set_repetition_penalty(rep_pen)?;
+    }
+    if let Some(seed) = payload.seed {
+        config.set_rng_seed(seed)?;
+    }
+    if let Some(stops) = payload.stop {
+        let stops_ref: Vec<&str> = stops.iter().map(|s| s.as_str()).collect();
+        config.set_stop_strings(&stops_ref)?;
+    }
+    if let Some(logprobs) = payload.logprobs {
+        if logprobs {
+            config.set_logprobs(payload.top_logprobs.unwrap_or(1))?;
+        }
+    }
+
+    let (response_text, metrics) = session_guard.generate_with_metrics(&full_prompt, &config)?;
 
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
@@ -235,7 +281,50 @@ fn create_streaming_response(
             .join("\n");
 
         let full_prompt = conversation + "\nAssistant:";
-        let max_tokens = payload.max_tokens.unwrap_or(4096);
+        let full_prompt = conversation + "\nAssistant:";
+        
+        // Build configuration
+        let mut config = match crate::inference::genai::GenerationConfig::new() {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+
+        if let Some(max_tokens) = payload.max_tokens {
+            let _ = config.set_max_new_tokens(max_tokens);
+        } else {
+            let _ = config.set_max_new_tokens(4096);
+        }
+
+        if let Some(temp) = payload.temperature {
+            let _ = config.set_temperature(temp);
+        }
+        if let Some(top_p) = payload.top_p {
+            let _ = config.set_top_p(top_p);
+        }
+        if let Some(top_k) = payload.top_k {
+            let _ = config.set_top_k(top_k);
+        }
+        if let Some(freq_pen) = payload.frequency_penalty {
+            let _ = config.set_frequency_penalty(freq_pen);
+        }
+        if let Some(pres_pen) = payload.presence_penalty {
+            let _ = config.set_presence_penalty(pres_pen);
+        }
+        if let Some(rep_pen) = payload.repetition_penalty {
+            let _ = config.set_repetition_penalty(rep_pen);
+        }
+        if let Some(seed) = payload.seed {
+            let _ = config.set_rng_seed(seed);
+        }
+        if let Some(stops) = payload.stop {
+            let stops_ref: Vec<&str> = stops.iter().map(|s| s.as_str()).collect();
+            let _ = config.set_stop_strings(&stops_ref);
+        }
+        if let Some(logprobs) = payload.logprobs {
+            if logprobs {
+                let _ = config.set_logprobs(payload.top_logprobs.unwrap_or(1));
+            }
+        }
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -251,9 +340,16 @@ fn create_streaming_response(
         let session_clone = Arc::clone(&session);
         let prompt_clone = full_prompt.clone();
 
+        // SAFETY: GenerationConfig is Send + Sync and copied into the C++ pipeline
+        // We need to move it into the closure, but GenerateConfig is not Clone.
+        // However, we create a new config for each request, so we can just move it.
+        // The issue is that spawn_blocking requires 'static, so we need to be careful.
+        // Actually, config is moved into spawn_blocking, so it's fine.
+        
         tokio::task::spawn_blocking(move || {
             let mut session_guard = session_clone.blocking_write();
-            session_guard.generate_stream(&prompt_clone, max_tokens, move |token| {
+            // We need to pass the config by reference to the session method
+            session_guard.generate_stream(&prompt_clone, &config, move |token| {
                 tx.send(token.to_string()).ok();
                 true
             })

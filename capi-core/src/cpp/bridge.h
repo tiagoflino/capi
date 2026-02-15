@@ -80,5 +80,10 @@ void config_set_top_p(GenerationConfigWrapper& config, float top_p);
 void config_set_top_k(GenerationConfigWrapper& config, size_t top_k);
 void config_set_do_sample(GenerationConfigWrapper& config, bool do_sample);
 void config_set_stop_strings(GenerationConfigWrapper& config, rust::Vec<rust::String> stop_strings);
+void config_set_frequency_penalty(GenerationConfigWrapper& config, float frequency_penalty);
+void config_set_presence_penalty(GenerationConfigWrapper& config, float presence_penalty);
+void config_set_repetition_penalty(GenerationConfigWrapper& config, float repetition_penalty);
+void config_set_rng_seed(GenerationConfigWrapper& config, size_t seed);
+void config_set_logprobs(GenerationConfigWrapper& config, size_t logprobs);
 
 } // namespace genai_bridge

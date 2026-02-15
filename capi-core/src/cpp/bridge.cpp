@@ -131,6 +131,26 @@ void config_set_stop_strings(GenerationConfigWrapper& config, rust::Vec<rust::St
     config.config.stop_strings = stops;
 }
 
+void config_set_frequency_penalty(GenerationConfigWrapper& config, float frequency_penalty) {
+    config.config.frequency_penalty = frequency_penalty;
+}
+
+void config_set_presence_penalty(GenerationConfigWrapper& config, float presence_penalty) {
+    config.config.presence_penalty = presence_penalty;
+}
+
+void config_set_repetition_penalty(GenerationConfigWrapper& config, float repetition_penalty) {
+    config.config.repetition_penalty = repetition_penalty;
+}
+
+void config_set_rng_seed(GenerationConfigWrapper& config, size_t seed) {
+    config.config.rng_seed = seed;
+}
+
+void config_set_logprobs(GenerationConfigWrapper& config, size_t logprobs) {
+    config.config.logprobs = logprobs;
+}
+
 // Tokenizer methods
 std::unique_ptr<TokenizerWrapper> pipeline_get_tokenizer(const LLMPipelineWrapper& pipeline) {
     return std::make_unique<TokenizerWrapper>(pipeline.pipeline->get_tokenizer());

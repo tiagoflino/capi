@@ -61,6 +61,36 @@ impl GenerationConfig {
         Ok(())
     }
 
+    /// Set frequency penalty.
+    pub fn set_frequency_penalty(&mut self, frequency_penalty: f32) -> Result<()> {
+        ffi::config_set_frequency_penalty(self.inner.pin_mut(), frequency_penalty);
+        Ok(())
+    }
+
+    /// Set presence penalty.
+    pub fn set_presence_penalty(&mut self, presence_penalty: f32) -> Result<()> {
+        ffi::config_set_presence_penalty(self.inner.pin_mut(), presence_penalty);
+        Ok(())
+    }
+
+    /// Set repetition penalty.
+    pub fn set_repetition_penalty(&mut self, repetition_penalty: f32) -> Result<()> {
+        ffi::config_set_repetition_penalty(self.inner.pin_mut(), repetition_penalty);
+        Ok(())
+    }
+
+    /// Set random seed.
+    pub fn set_rng_seed(&mut self, seed: usize) -> Result<()> {
+        ffi::config_set_rng_seed(self.inner.pin_mut(), seed);
+        Ok(())
+    }
+    
+    /// Set number of top logprobs to return.
+    pub fn set_logprobs(&mut self, logprobs: usize) -> Result<()> {
+        ffi::config_set_logprobs(self.inner.pin_mut(), logprobs);
+        Ok(())
+    }
+
     /// Get a reference to the inner wrapper for FFI calls.
     pub(crate) fn inner(&self) -> &ffi::GenerationConfigWrapper {
         &self.inner
