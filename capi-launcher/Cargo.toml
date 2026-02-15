@@ -18,3 +18,4 @@ flate2 = "1.0"
 tar = "0.4"
 indicatif = "0.17"
 futures-util = { workspace = true }
+zip = "0.6"
